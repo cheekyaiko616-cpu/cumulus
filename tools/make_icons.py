@@ -2,14 +2,17 @@
 """アプリのアイコンを、手描きのスケッチ（tools/icon-source/original.jpg）から作る。
 
   pip install pillow numpy scipy scikit-image
-  python3 tools/make_icons.py            # icons/ に書き出す
-  python3 tools/make_icons.py OUT_DIR    # 別の場所に書き出す
+  python3 tools/make_icons.py                   # icons/ に書き出す（すべて背景が透明）
+  python3 tools/make_icons.py OUT_DIR           # 別の場所に書き出す
+  python3 tools/make_icons.py --opaque-apple    # ホーム画面用(apple-touch-icon.png)だけ、淡い緑の不透明な背景にする
 
 やっていること
   1. 鉛筆の濃い線だけを取り出す（淡いハッチングと汚れは捨てる）。線をなめらかにして、同じ太さにそろえる
   2. 線で囲まれた面を調べ、面ごとに平らな1色で塗る（グラデーションなし）。背景は透明
   3. 大きく描いてから縮めて、縁をなめらかにする（透明部分に色のにじみが出ないよう、縮めるときは「不透明度を掛けた色」で計算する）
+  4. 外側の背景は、不透明度をちょうど0にそろえる（縮めるときに出る、ほとんど見えないにじみも0にする）
 色は5色：線と矢印の緑 / 雲のうすいミント / ブタのピンク / コインの金 / （背景は透明）
+どのアイコンも背景は透明。不透明な背景が要るのは --opaque-apple のときだけ
 """
 import sys, pathlib
 import numpy as np
@@ -19,7 +22,9 @@ from skimage.morphology import disk, remove_small_objects
 
 ROOT = pathlib.Path(__file__).resolve().parent
 SRC = ROOT / "icon-source" / "original.jpg"
-OUT = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT.parent / "icons"
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+OPAQUE_APPLE = "--opaque-apple" in sys.argv
+OUT = pathlib.Path(ARGS[0]) if ARGS else ROOT.parent / "icons"
 S = 2                                   # 作業は2倍の大きさ（2048px）で行う
 
 LINE = (23, 79, 66)                     # #174f42 線
@@ -27,7 +32,7 @@ ARROW = (29, 99, 82)                    # #1d6352 矢印
 CLOUD = (248, 251, 250)                 # #f8fbfa 雲
 PIG = (243, 170, 163)                   # #f3aaa3 ブタ
 COIN = (217, 165, 32)                   # #d9a520 コイン
-BG = (220, 235, 229)                    # #dcebe5 不透明のアイコンの背景（ホーム画面用・maskable用）
+BG = (220, 235, 229)                    # #dcebe5 --opaque-apple のときだけ使う背景
 
 # 面の見分けに使う位置（元画像 1024px 上の座標）
 SEEDS = {"coin": [(487, 204)], "pig": [(514, 308), (624, 223), (644, 311)], "cloud": [(412, 526), (635, 669), (600, 387)]}
@@ -111,6 +116,16 @@ def compose(pm, size, fit, bg=None, circle=None):
     return Image.fromarray(np.clip(res + 0.5, 0, 255).astype(np.uint8), "RGBA")
 
 
+def clear_background(im):
+    """外側の背景（画像の四辺につながる、ほぼ透明な部分）を、不透明度ちょうど0・色も0にそろえる。
+    縮めるときに出る、ほとんど見えないにじみ（不透明度1〜16）もここで消える。絵に囲まれた内側は触らない"""
+    a = np.array(im.convert("RGBA"))
+    lab, _ = ndi.label(a[..., 3] <= 16)
+    edge = np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))
+    a[np.isin(lab, edge[edge > 0])] = 0
+    return Image.fromarray(a, "RGBA")
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     rgb, alpha = build()
@@ -119,11 +134,12 @@ def main():
         ("icon-1024.png", compose(pm, 1024, 0.86)),                  # 透明の元データ
         ("icon-512.png", compose(pm, 512, 0.86)),                    # 透明（any）
         ("icon-192.png", compose(pm, 192, 0.86)),                    # 透明（any）
-        ("icon-maskable-512.png", compose(pm, 512, 0.80, bg=BG, circle=0.40)),   # 不透明・安全領域（中央の円）に収める
-        ("apple-touch-icon.png", compose(pm, 180, 0.74, bg=BG)),     # iPhoneのホーム画面用：不透明（透明だと黒になる）
+        ("apple-touch-icon.png", compose(pm, 180, 0.74, bg=BG if OPAQUE_APPLE else None)),   # iPhoneのホーム画面用：透明。iOSが黒などの背景にする場合は --opaque-apple
         ("favicon-32.png", compose(pm, 32, 0.96)),                   # タブ用
     ]
     for name, im in jobs:
+        if im.mode == "RGBA":
+            im = clear_background(im)
         # 色数の少ない平らな絵なので、大きい画像はパレット形式（128色）にして軽くする（見た目の差は0.3/255以下）。小さい画像（192px以下）はそのまま
         if im.size[0] >= 256:
             im = im.quantize(colors=128, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)

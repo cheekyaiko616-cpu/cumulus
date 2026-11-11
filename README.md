@@ -35,8 +35,8 @@ GitHub Pages でそのまま公開できる（ビルド不要）。記録はこ�
 
 - 作り方：濃い線だけを取り出して太さをそろえ、線で囲まれた面を1色ずつ塗る（鉛筆のハッチングやグラデーションはなし）。色は線と矢印の緑・雲のミント・ブタのピンク・コインの金
 - 作り直し：`pip install pillow numpy scipy scikit-image` のあと `python3 tools/make_icons.py`。`icons/` に書き出す
-- `icons/icon-1024.png`（透明の元データ）、`icon-512.png`・`icon-192.png`（透明）、`icon-maskable-512.png`（不透明・中央の円に収めた版）、`apple-touch-icon.png`（180px・不透明）、`favicon-32.png`
-- iPhoneのホーム画面：ホーム画面に追加するときに使われるのは `apple-touch-icon.png`。iOSは透明のアイコンを黒の背景にしてしまうため、これだけは不透明にしてある。ホーム画面を「クリア」にしたときの見た目は、iOSがこのアイコンから作る（アプリ側では指定できない）
+- **どのアイコンも、背景は透過率100%（不透明度ちょうど0）**：`icons/icon-1024.png`（元データ）、`icon-512.png`・`icon-192.png`、`apple-touch-icon.png`（180px。ホーム画面用）、`favicon-32.png`。不透明な背景のアイコン（maskable）は置いていない
+- iPhoneのホーム画面：ホーム画面に追加するときに使われるのは `apple-touch-icon.png`。iOSは、WebアプリのアイコンのうちRGBで透明な部分を、黒などの背景にして表示することがある。「クリア」の見た目はiOSがこのアイコンから作り、アプリ側では指定できない。背景が黒く見えて困るときは `python3 tools/make_icons.py --opaque-apple` で、ホーム画面用だけを淡い緑（#dcebe5）の不透明な背景にして作り直せる
 
 ## ファイル構成
 ```
