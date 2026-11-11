@@ -30,6 +30,14 @@ GitHub Pages でそのまま公開できる（ビルド不要）。記録はこ�
 - カード番号・口座番号などは入力しない（長い数字を含む入力は登録できない）
 - 記録はこの端末の中だけ。サーバーには送らない（メール連携を使う場合のみ、自分のGoogleアカウントの小さなプログラムに問い合わせる）
 
+## アイコン
+手描きのスケッチ（`tools/icon-source/original.jpg`：雲の上のブタの貯金箱と右上がりの矢印）を、背景が透明の平らな絵にして使っている。
+
+- 作り方：濃い線だけを取り出して太さをそろえ、線で囲まれた面を1色ずつ塗る（鉛筆のハッチングやグラデーションはなし）。色は線と矢印の緑・雲のミント・ブタのピンク・コインの金
+- 作り直し：`pip install pillow numpy scipy scikit-image` のあと `python3 tools/make_icons.py`。`icons/` に書き出す
+- `icons/icon-1024.png`（透明の元データ）、`icon-512.png`・`icon-192.png`（透明）、`icon-maskable-512.png`（不透明・中央の円に収めた版）、`apple-touch-icon.png`（180px・不透明）、`favicon-32.png`
+- iPhoneのホーム画面：ホーム画面に追加するときに使われるのは `apple-touch-icon.png`。iOSは透明のアイコンを黒の背景にしてしまうため、これだけは不透明にしてある。ホーム画面を「クリア」にしたときの見た目は、iOSがこのアイコンから作る（アプリ側では指定できない）
+
 ## ファイル構成
 ```
 index.html                 画面の骨組み（読み込む順番もここ）
@@ -41,6 +49,8 @@ js/main.js                 タブの切り替え・起動
 tools/build.py             動作確認用に1ファイルへまとめる
 tools/apps-script/Code.gs  メールを読むGoogleアカウント内のプログラム
 tools/make_gas_source.py   Code.gs をアプリ内の「スクリプトをコピー」用に写す
+tools/make_icons.py        スケッチからアイコン一式を作る（元の絵は tools/icon-source/）
+icons/, manifest.webmanifest  ホーム画面用のアイコンと設定
 ```
 
 ## 電池への配慮（すべてのコードに適用する決まり）
