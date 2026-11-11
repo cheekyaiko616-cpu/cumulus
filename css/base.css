@@ -7,6 +7,7 @@
   --danger: #b9483f; --border: #d5e1dc; --band: #174f42;
   --warn-bg: #fbe9e5; --warn-fg: #a8463d;
   --cash: #1d6352; --code: #2b78a8; --credit: #7a5aa6;
+  --ill-line: #174f42; --ill-pig: #f3aaa3; --ill-coin: #d9a520;   /* 「使わなかった日」のイラストの色 */
   --num: "Barlow Semi Condensed", "Hiragino Sans", "Yu Gothic", sans-serif;
   --jp: "Hiragino Sans", "Yu Gothic", "Meiryo", system-ui, sans-serif;
   padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);   /* 画面の上下の安全な余白（ノッチ・ホームバー） */
@@ -19,6 +20,7 @@
     --danger: #eba39a; --border: #25403a; --band: #10382f;
     --warn-bg: #3f2623; --warn-fg: #eba39a;
     --cash: #6cc3ab; --code: #6fb3de; --credit: #b59ad8;
+    --ill-line: #9fd8c6; --ill-pig: #e89a92; --ill-coin: #e0b040;
     color-scheme: dark;
   }
 }
@@ -29,6 +31,7 @@
   --danger: #eba39a; --border: #25403a; --band: #10382f;
   --warn-bg: #3f2623; --warn-fg: #eba39a;
   --cash: #6cc3ab; --code: #6fb3de; --credit: #b59ad8;
+  --ill-line: #9fd8c6; --ill-pig: #e89a92; --ill-coin: #e0b040;
   color-scheme: dark;
 }
 /* ===== 全体の土台 ===== */

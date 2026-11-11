@@ -19,8 +19,9 @@
 .cell.other { opacity: .4; }
 .cell.today { background: var(--accent); color: var(--on-accent); }
 .cell.today .d { color: var(--on-accent); font-weight: 700; }
-.bag { font-size: 20px; line-height: 1; display: inline-block; flex-shrink: 0; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
-.cell .bag { font-size: 22px; margin-top: 1px; }
+.saved-ic { width: 20px; height: 20px; display: inline-block; flex-shrink: 0; }
+.cell .saved-ic { width: 22px; height: 22px; margin-top: 1px; }
+.note .saved-ic { width: 22px; height: 22px; }
 .cell.saved { background: var(--gold-soft); }
 .grid.from-r { animation: fr .2s ease; } .grid.from-l { animation: fl .2s ease; }
 @keyframes fr { from { transform: translateX(24px); opacity: .3; } } @keyframes fl { from { transform: translateX(-24px); opacity: .3; } }
@@ -41,7 +42,7 @@ button.fig { font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .cal .grid { flex: 1 1 auto; min-height: 0; grid-auto-rows: minmax(0, 1fr); gap: 3px; }
 .cal .legend { margin-top: 8px; }
 @media (max-height: 760px) { .cal .legend { display: none; } }
-@media (max-height: 640px) { .cell .amt { font-size: 12px; } .cell .bag { font-size: 18px; } }
+@media (max-height: 640px) { .cell .amt { font-size: 12px; } .cell .saved-ic { width: 20px; height: 20px; } }
 /* 高さの低い画面（〜600px）では、上の数字とマスの中身を一回り小さくして、1画面に収める */
 @media (max-height: 600px) {
   .figs.compact .fig { padding: 5px 10px; }
@@ -50,5 +51,5 @@ button.fig { font: inherit; color: inherit; text-align: left; cursor: pointer; }
   .cell { padding: 2px 0; gap: 1px; }
   .cell .d { font-size: 12px; line-height: 1.15; }
   .cell .amt { font-size: 11px; }
-  .cell .bag { font-size: 15px; margin-top: 0; }
+  .cell .saved-ic { width: 16px; height: 16px; margin-top: 0; }
 }

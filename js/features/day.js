@@ -17,7 +17,7 @@ function renderDay() {
   $("dayTitle").textContent = (d.getMonth() + 1) + "月" + d.getDate() + "日（" + WD[d.getDay()] + "）";
   let html = "";
   if (list.length) html = list.map((e) => entryHtml(e, false)).join("") + '<div class="total" style="margin-top:6px"><span>この日の合計</span><span class="num">' + yen(spentOn(dayKey)) + "</span></div>";
-  else if (isSavedDay(dayKey)) html = '<div class="note"><span class="bag" aria-hidden="true">💰</span><span>この日は何も買わなかったので、<b>' + yen(state.daily) + "</b> を投資資金に記録しました。</span></div>";
+  else if (isSavedDay(dayKey)) html = '<div class="note"><svg class="saved-ic" aria-hidden="true" focusable="false"><use href="#i-saved"/></svg><span>この日は何も買わなかったので、<b>' + yen(state.daily) + "</b> を投資資金に記録しました。</span></div>";
   else if (dayKey === todayStr()) html = '<div class="note"><span>今日はまだ何も買っていません。このまま1日を終えると <b>' + yen(state.daily) + "</b> が投資資金に加わります。</span></div>";
   else html = emptyHtml(dayKey < state.start ? "数え始める日より前の日です。" : "まだ来ていない日です。");
   $("dayBody").innerHTML = payNotes(dayKey) + html;

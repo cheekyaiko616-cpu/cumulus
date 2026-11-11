@@ -230,7 +230,7 @@ def main():
         if f not in index: errors.append(f"{f} が index.html に書かれていません")
     css_text = {f: re.sub(r"/\*.*?\*/", "", read(f), flags=re.S) for f in css_files}
     all_css = "\n".join(css_text.values())
-    defined = set(re.findall(r"(--[\w-]+)\s*:", all_css)); used_vars = set(re.findall(r"var\((--[\w-]+)", all_css))
+    defined = set(re.findall(r"(--[\w-]+)\s*:", all_css)); used_vars = set(re.findall(r"var\((--[\w-]+)", all_css + index))   # index.html のスプライト（SVG）の中の var(--…) も使用に数える
     for v in sorted(used_vars - defined): errors.append(f"CSS: {v} を使っていますが、どこにも定義がありません")
     dynamic = {"--cash", "--code", "--credit"}   # payColor() が「var(--」＋支払い方法の名前で作る色
     for v in sorted(defined - used_vars - dynamic): warns.append(f"CSS: {v} は定義だけで、使われていません")

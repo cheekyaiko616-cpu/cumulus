@@ -14,7 +14,7 @@ function cellHtml(y, m, d, today, other) {
   const spent = spentOn(key), saved = isSavedDay(key);
   if (saved) cls.push("saved");
   const pp = paysByDate[key], payAmt = pp ? pp.reduce((a, p) => a + p.amount, 0) : 0;   // この日に引き落とされるカード代
-  const mark = byDate[key] ? '<span class="amt">' + amtText(spent) + '</span>' : saved ? '<span class="bag" aria-hidden="true">💰</span>' : "";
+  const mark = byDate[key] ? '<span class="amt">' + amtText(spent) + '</span>' : saved ? '<svg class="saved-ic" aria-hidden="true" focusable="false"><use href="#i-saved"/></svg>' : "";
   const label = (m + 1) + "月" + d + "日（" + WD[wd] + "）" + (key === today ? "、今日" : "") + (byDate[key] ? "、" + comma(spent) + "円 使った" : saved ? "、使わなかった日" : "") + (pp ? "、クレジット引き落とし " + comma(payAmt) + "円" : "");
   return '<button type="button" class="' + cls.join(" ") + '" data-date="' + key + '"' + (other ? ' data-other="1"' : "") + ' aria-label="' + label + '"><span class="d">' + d + "</span>" + mark + (pp ? '<span class="pay-mark" aria-hidden="true">💳</span>' : "") + "</button>";
 }
