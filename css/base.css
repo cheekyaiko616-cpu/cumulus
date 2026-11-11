@@ -61,3 +61,11 @@ main.fit #view-calendar { flex: 1 1 auto; min-height: 0; }
 
 .sample { flex-shrink: 0; background: var(--gold-soft); color: var(--text); border-radius: 10px; padding: 4px 6px 4px 12px; font-size: 12px; display: flex; gap: 8px; align-items: center; justify-content: space-between; }
 .sample button { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 3px 10px; font-size: 12px; font-weight: 700; }
+/* 幅の狭い画面（〜350px）でも、ヘッダーを1行に収める */
+@media (max-width: 350px) {
+  header .col { gap: 6px; flex-wrap: nowrap; }
+  .hbtn { width: 34px; height: 36px; font-size: 22px; }
+  .pill { padding: 4px 9px; font-size: 15px; white-space: nowrap; }
+  .pill .caret { margin-left: 4px; }
+  .ghost { padding: 2px 9px; font-size: 13px; }
+}
