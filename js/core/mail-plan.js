@@ -68,7 +68,12 @@ function applyImport(plan) {
   state.mail.seen = state.mail.seen.slice(-MAX_SEEN);
   return plan.add.length;
 }
-const planNote = (p, u) => "追加" + p.add.length + "件・重複" + p.dup.length + "件・取込済み" + p.done.length + "件" + (p.other.length ? "・要確認" + p.other.length + "件" : "") + (u ? "・読めなかったメール" + u + "通" : "");
+// i：スクリプトが返した通数の内訳 { found, checked }（古いスクリプトは返さないので、無いときは何も足さない）
+const planNote = (p, u, i) => {
+  if (i && i.found === 0) return "検索条件に合うメールが0通でした";
+  return "追加" + p.add.length + "件・重複" + p.dup.length + "件・取込済み" + p.done.length + "件" + (p.other.length ? "・要確認" + p.other.length + "件" : "") +
+    (i && i.checked >= 0 ? "・メール" + i.checked + "通を確認" : "") + (u ? "・読めなかったメール" + u + "通" : "");
+};
 
 // ---- レシートとの結び付け ----
 // レシートの入力と同じ買い物の、メールの記録を探す：同じカード・同じ合計・日付が前後1日以内で、まだレシートと結び付いていないもの

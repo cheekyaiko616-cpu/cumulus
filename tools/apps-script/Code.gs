@@ -21,20 +21,52 @@ function doGet(e) {
   const days = Math.max(1, Math.min(120, Number(p.days) || DEFAULT_DAYS));
   const since = Date.now() - days * 86400000;
   const items = [];
-  let unreadable = 0;
+  let unreadable = 0, found = 0, excluded = 0, checked = 0;   // found=検索に合ったメール通数／excluded=送信元・期間で除いた通数／checked=読もうとした通数
   ISSUERS.forEach(function (is) {
     GmailApp.search(is.query + " newer_than:" + days + "d", 0, MAX_THREADS).forEach(function (th) {
       th.getMessages().forEach(function (m) {
-        if (String(m.getFrom()).toLowerCase().indexOf(is.sender) < 0) return;   // 送信元が違うものは読まない
-        if (m.getDate().getTime() < since) return;
-        const got = is.parse(m.getSubject(), m.getPlainBody());
+        found++;
+        if (String(m.getFrom()).toLowerCase().indexOf(is.sender) < 0) { excluded++; return; }   // 送信元が違うものは読まない
+        if (m.getDate().getTime() < since) { excluded++; return; }
+        checked++;
+        const got = readMessage(is, m);
         if (!got.length || got.skipped) unreadable++;            // 読めなかったもの（一部だけの場合も）は、通数で数える
         if (!got.length) return;
-                got.forEach(function (g, i) { items.push(Object.assign({ id: m.getId() + (i ? "-" + i : ""), issuer: is.id }, g)); });
+        got.forEach(function (g, i) { items.push(Object.assign({ id: m.getId() + (i ? "-" + i : ""), issuer: is.id }, g)); });
       });
     });
   });
-  return reply({ ok: true, items: items, unreadable: unreadable, at: new Date().toISOString() });
+  return reply({ ok: true, items: items, unreadable: unreadable, found: found, excluded: excluded, checked: checked, at: new Date().toISOString() });
+}
+
+// 本文を読む。まずプレーンテキスト。読めなければ、HTML版からタグを除いた文字列で読み直す（HTMLだけ・表組みのメール用）
+function readMessage(is, m) {
+  const subject = m.getSubject();
+  const got = is.parse(subject, m.getPlainBody());
+  if (got.length) return got;
+  let html = "";
+  try { html = m.getBody(); } catch (err) { html = ""; }
+  if (!html) return got;
+  const alt = is.parse(subject, htmlToText(html));
+  if (alt.length) return alt;
+  return alt.skipped && !got.skipped ? alt : got;
+}
+
+// HTML → 文字列。表のセル・行・段落・改行の境目は改行にし、実体参照は元の文字に戻す
+function htmlToText(html) {
+  const ent = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", yen: "¥" };
+  return String(html || "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<(script|style|head)[\s\S]*?<\/\1\s*>/gi, "")
+    .replace(/<br\s*\/?>|<\/(td|th|tr|p|div|li|ul|ol|table|h[1-6])\s*>|<(tr|p|div|li|table|h[1-6])[\s>\/]/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&#x([0-9a-f]+);/gi, function (_, h) { return String.fromCharCode(parseInt(h, 16)); })
+    .replace(/&#(\d+);/g, function (_, d) { return String.fromCharCode(Number(d)); })
+    .replace(/&([a-z]+);/gi, function (all, n) { return Object.prototype.hasOwnProperty.call(ent, n.toLowerCase()) ? ent[n.toLowerCase()] : all; })
+    .replace(/[\u200b-\u200d\ufeff]/g, "")
+    .replace(/[ \t\u3000\u00a0]+/g, " ")
+    .replace(/ *\n[ \n]*/g, "\n")
+    .trim();
 }
 
 function reply(obj) {
@@ -43,9 +75,10 @@ function reply(obj) {
 
 // ---- 三井住友カード「ご利用のお知らせ」 ----
 // 例：ご利用日時：2026/11/08 17:53 ／ 利用先（買物） ／ 341円
+// HTMLメール（表組み・全角英数・折り返し）は、htmlToText で文字列にしてから、同じ関数で読む
 function parseSmbc(subject, body) {
-  const t = String(body || "").normalize("NFKC").replace(/\r/g, "");
-  const re = /ご利用日時\s*[:：]\s*(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/g;
+  const t = String(body || "").normalize("NFKC").replace(/\r/g, "").replace(/[\u200b-\u200d\ufeff]/g, "");
+  const re = /ご利用日時\s*[:：]\s*(\d{4})\/(\d{1,2})\/(\d{1,2})\s*(\d{1,2}):(\d{2})/g;
   const marks = [];
   let m;
   while ((m = re.exec(t))) marks.push({ at: m.index, end: re.lastIndex, m: m });
@@ -57,8 +90,9 @@ function parseSmbc(subject, body) {
     const seg = t.slice(k.end, stop);
     const a = seg.match(/(\d[\d,]*)\s*円/);
     if (!a) return;
-    let store = seg.slice(0, a.index).replace(/\s+/g, " ").trim();
-    if (!store) store = (seg.slice(a.index + a[0].length).split("\n").map(function (x) { return x.replace(/\s+/g, " ").trim(); }).filter(Boolean)[0] || "");
+    const fold = function (x) { return x.replace(/\s+/g, " ").trim().replace(/\(([^()]*)\)/g, function (_, k) { return "(" + k.replace(/\s+/g, "") + ")"; }); };   // 「（買\n物）」のように途中で折り返されても「（買物）」にする
+    let store = fold(seg.slice(0, a.index));
+    if (!store) store = (seg.slice(a.index + a[0].length).split("\n").map(fold).filter(Boolean)[0] || "");
     let kind = "";
     const km = store.match(/\(([^()]*)\)\s*$/);
     if (km) { kind = km[1]; store = store.slice(0, km.index).trim(); }

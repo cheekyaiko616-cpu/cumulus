@@ -8,7 +8,7 @@
 const MAIL_EVERY = 30 * 60 * 1000;                                // 自動で調べる間隔の下限（30分）
 const MAIL_RETRY = 10 * 60 * 1000;                                // 失敗したあと、自動で試し直すまでの下限（10分）
 let mailBlocked = false, mailTryAt = 0;                          // mailBlocked：URLや合言葉の誤りで失敗したあとは、直るまで自動では試さない
-let mailBusy = false, mailPending = 0, mailItems = [];
+let mailBusy = false, mailPending = 0, mailItems = [], mailInfo = null;   // mailInfo：検索に合った通数・確認した通数（診断用）
 
 // ---- 取得（通信） ----
 async function fetchMail() {
@@ -46,15 +46,16 @@ async function runMail(manual) {
     const j = await fetchMail();
     mailItems = j.items.filter(validItem);
     const plan = planImport(mailItems), u = Number(j.unreadable) || 0;
+    mailInfo = Number.isFinite(j.found) && Number.isFinite(j.checked) ? { found: j.found, checked: j.checked } : null;
     state.mail.last = Date.now(); mailBlocked = false;
     if (state.mail.auto) {
       const n = applyImport(plan);
-      state.mail.lastNote = planNote(plan, u); mailPending = 0;
+      state.mail.lastNote = planNote(plan, u, mailInfo); mailPending = 0;
       if (n) save(); else { persist(); renderMail(); }                  // 記録が増えなかったときは、書くだけ（画面は描き直さない）
       if (n) toast("メールから" + n + "件を記録しました");
-      mailMsg(planNote(plan, u));
+      mailMsg(planNote(plan, u, mailInfo));
     } else {
-      state.mail.lastNote = planNote(plan, u); mailPending = plan.add.length;
+      state.mail.lastNote = planNote(plan, u, mailInfo); mailPending = plan.add.length;
       persist(); renderMail();
       if (manual) { showPreview(plan, u); mailMsg(""); }
       else if (plan.add.length) toast("新しい利用明細が" + plan.add.length + "件あります。設定で確認できます");
@@ -81,7 +82,7 @@ function showPreview(plan, u) {
   const sec = (title, list) => list.length ? '<div class="subhead">' + title + "（" + list.length + "件）</div>" + list.map(pvRow).join("") : "";
   $("mailPrevBody").innerHTML = (plan.add.length ? "" : emptyHtml("新しく記録するものはありません")) +
     sec("記録する", plan.add) + sec("重複のため記録しない", plan.dup) + sec("要確認（取消・買物以外のため自動では記録しません）", plan.other) +
-    '<p class="hint">' + planNote(plan, u) + "</p>";
+    '<p class="hint">' + planNote(plan, u, mailInfo) + "</p>";
   $("mpOk").hidden = !plan.add.length; $("mpOk").textContent = plan.add.length + "件を記録する";
   openOv("mailPrevOverlay");
 }
