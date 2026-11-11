@@ -7,7 +7,7 @@
 
 let editingInv = null;
 function invItemHtml(v) {
-  return '<button type="button" class="item" data-inv="' + esc(v.id) + '"><span class="l">📈 ' + mdLabel(v.date) + " " + (v.memo ? esc(v.memo) : "投資") + '</span><span class="r">' + yen(v.amount) + "</span></button>";
+  return '<button type="button" class="item" data-inv="' + esc(v.id) + '"><span class="l"><svg class="up-ic" aria-hidden="true" focusable="false"><use href="#i-up"/></svg>' + mdLabel(v.date) + " " + (v.memo ? esc(v.memo) : "投資") + '</span><span class="r">' + yen(v.amount) + "</span></button>";
 }
 
 // ---- 入力画面 ----

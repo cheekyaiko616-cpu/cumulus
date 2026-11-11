@@ -9,7 +9,7 @@ let dayKey = "";
 // その日に引き落とされるカード代
 function payNotes(k) {
   const past = k < todayStr();
-  return (paysByDate[k] || []).map((p) => '<div class="note paynote"><span aria-hidden="true">💳</span><span><b>' + esc(p.card) + "</b> が <b>" + yen(p.amount) + "</b> " + (past ? "引き落とされました" : "引き落とされます") +
+  return (paysByDate[k] || []).map((p) => '<div class="note paynote"><svg class="card-ic" aria-hidden="true" focusable="false"><use href="#i-card"/></svg><span><b>' + esc(p.card) + "</b> が <b>" + yen(p.amount) + "</b> " + (past ? "引き落とされました" : "引き落とされます") +
     "<small>" + mdShort(p.from) + "〜" + mdShort(p.to) + "のご利用 " + p.count + "件分</small></span></div>").join("");
 }
 function renderDay() {

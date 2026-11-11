@@ -14,6 +14,7 @@
   7. core は画面（DOM）に触れない
   8. 同じ名前を、複数のファイルで定義していない
   9. CSS で使っている変数（--xxx）が、定義されている
+ 10. 絵文字を使っていない（index.html・js/・css/・tools/apps-script/Code.gs。SVGのイラストを使う）
 調べること（注意だけ）
   - 使われていない class（CSS）／使われていない関数・定数（JS）／書いたのに使っていない依存
 """
@@ -30,6 +31,16 @@ addDays dayNo daysBetween todayStr cycleEnd cycleStart payDateOf makeCard normIn
 updateCardHint updateMatch openOv closeOv openStack armed toast refreshIfNewDay scheduleMidnight state byDate pays paysByDate KEY storageOk
 dirty RENDER tab period customFrom customTo invMode invFrom invTo invAnchor sumAnchor viewYear viewMonth dayKey matchMode mailBlocked
 mailTryAt lastToday midnightTimer entryHtml renderDay renderNextPay renderCardList readRows editing editPay ocrBusy mailBusy""".split())
+
+# 絵文字（Extended_Pictographic の主な範囲＋異体字選択子・ZWJ・囲み数字・国旗）。✓ ✕ ‹ › ▼ ＋ ・ ¥ 〜 などの記号は絵文字ではないので使ってよい
+EMOJI_OK = set("\u2713\u2715")
+EMOJI_RANGES = [(0x1F000, 0x1FAFF), (0x2600, 0x27BF), (0x2194, 0x2199), (0x21A9, 0x21AA), (0x231A, 0x231B), (0x2328, 0x2328), (0x23CF, 0x23CF),
+                (0x23E9, 0x23F3), (0x23F8, 0x23FA), (0x24C2, 0x24C2), (0x25AA, 0x25AB), (0x25B6, 0x25B6), (0x25C0, 0x25C0), (0x25FB, 0x25FE),
+                (0x2934, 0x2935), (0x2B05, 0x2B07), (0x2B1B, 0x2B1C), (0x2B50, 0x2B50), (0x2B55, 0x2B55), (0x3030, 0x3030), (0x303D, 0x303D),
+                (0x3297, 0x3297), (0x3299, 0x3299), (0xFE0F, 0xFE0F), (0x200D, 0x200D), (0x20E3, 0x20E3), (0xA9, 0xA9), (0xAE, 0xAE),
+                (0x203C, 0x203C), (0x2049, 0x2049), (0x2122, 0x2122), (0x2139, 0x2139)]
+def is_emoji(ch):
+    return ch not in EMOJI_OK and any(a <= ord(ch) <= b for a, b in EMOJI_RANGES)
 
 def read(p):
     return (ROOT / p).read_text(encoding="utf8")
@@ -265,6 +276,13 @@ def main():
             if sel in seen: dups.append((f, sel))
             seen[sel] = 1
     for f, sel in dups: warns.append(f"{f}: 選択子「{sel}」が2回書かれています（まとめられます）")
+
+    emoji_files = ["index.html", "tools/apps-script/Code.gs"] + sorted(str(q.relative_to(ROOT)) for d in ("js", "css") for q in (ROOT / d).rglob("*") if q.suffix in (".js", ".css"))
+    for f in emoji_files:                         # 絵文字（自動で作る gas-source.js は Code.gs の写しなので対象外）
+        if f in SKIP_FILES: continue
+        for n, line in enumerate(read(f).splitlines(), 1):
+            hit = sorted({c for c in line if is_emoji(c)})
+            if hit: errors.append(f"{f}:{n}: 絵文字は使わない。SVGのイラストを使う（見つかった文字: {' '.join('U+%04X' % ord(c) for c in hit)}）")
 
     if report:
         js = [f for f in on_disk if f not in SKIP_FILES]

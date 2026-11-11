@@ -22,7 +22,7 @@ function renderCardList() {
 function renderNextPay() {
   const t = todayStr(), list = pays.filter((p) => p.date >= t).slice(0, 3), box = $("nextPay");
   box.hidden = !list.length;
-  box.innerHTML = list.length ? '<div class="np-title">💳 次の引き落とし</div>' +
+  box.innerHTML = list.length ? '<div class="np-title"><svg class="card-ic" aria-hidden="true" focusable="false"><use href="#i-card"/></svg>次の引き落とし</div>' +
     list.map((p) => '<div class="np-row"><span>' + mdLabel(p.date) + " " + esc(p.card) + '</span><b class="num">' + yen(p.amount) + "</b></div>").join("") : "";
 }
 $("openCards").onclick = () => { renderCardList(); renderNextPay(); openOv("cardsOverlay"); };

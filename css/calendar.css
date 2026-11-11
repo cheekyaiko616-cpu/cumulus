@@ -21,15 +21,17 @@
 .cell.today .d { color: var(--on-accent); font-weight: 700; }
 .saved-ic { width: 20px; height: 20px; display: inline-block; flex-shrink: 0; }
 .cell .saved-ic { width: 22px; height: 22px; margin-top: 1px; }
-.note .saved-ic { width: 22px; height: 22px; }
+.note .saved-ic, .note .card-ic { width: 22px; height: 22px; }
 .cell.saved { background: var(--gold-soft); }
 .grid.from-r { animation: fr .2s ease; } .grid.from-l { animation: fl .2s ease; }
 @keyframes fr { from { transform: translateX(24px); opacity: .3; } } @keyframes fl { from { transform: translateX(-24px); opacity: .3; } }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; font-size: 12px; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 5px; }
-.pay-mark { position: absolute; bottom: 2px; right: 2px; font-size: 10px; line-height: 1; }
+.card-ic { width: 18px; height: 18px; display: inline-block; flex-shrink: 0; vertical-align: middle; }
+.pay-mark { position: absolute; bottom: 2px; right: 2px; width: 12px; height: 12px; }
 .nextpay { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 10px 14px; }
-.np-title { font-size: 12px; color: var(--muted); font-weight: 700; margin-bottom: 2px; }
+.np-title { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 700; margin-bottom: 2px; }
+.np-title .card-ic { width: 20px; height: 20px; }
 .np-row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
 .np-row span { min-width: 0; overflow-wrap: anywhere; }
 /* カレンダー画面を1画面に収める */
@@ -52,4 +54,5 @@ button.fig { font: inherit; color: inherit; text-align: left; cursor: pointer; }
   .cell .d { font-size: 12px; line-height: 1.15; }
   .cell .amt { font-size: 11px; }
   .cell .saved-ic { width: 16px; height: 16px; margin-top: 0; }
+  .pay-mark { width: 10px; height: 10px; bottom: 1px; right: 1px; }
 }

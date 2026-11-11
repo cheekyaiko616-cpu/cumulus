@@ -14,6 +14,7 @@
 .item { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); width: 100%; background: none; border-left: 0; border-right: 0; border-bottom: 0; text-align: left; }
 .item:first-of-type { border-top: 0; }
 .item .l { min-width: 0; overflow-wrap: anywhere; }
+.up-ic { width: 18px; height: 18px; display: inline-block; vertical-align: -4px; margin-right: 6px; }
 .item .l small { display: block; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .item .r { font-family: var(--num); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 17px; white-space: nowrap; }
 .chip { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 8px; padding: 0 7px; margin-left: 6px; background: var(--accent-soft); color: var(--accent); vertical-align: 1px; }
