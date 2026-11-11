@@ -91,6 +91,7 @@ $("mpOk").onclick = () => {
 };
 
 // ---- 設定画面 ----
+const mailPickId = (k) => "mCard" + k[0].toUpperCase() + k.slice(1);
 function renderMail() {
   const m = state.mail, ready = mailReady();
   $("mailSummary").textContent = !ready ? "未設定" : mailPending ? "新着" + mailPending + "件" : m.auto ? "自動で記録" : "確認して記録";
@@ -98,15 +99,18 @@ function renderMail() {
   if (document.activeElement !== $("mailUrl")) $("mailUrl").value = m.url;
   setSeg($("mailSeg"), (b) => (b.dataset.a === "1") === m.auto);
   const names = state.cards.map((c) => c.name);
-  $("mCardSmbc").innerHTML = '<option value="">自動（名前に「三井住友」を含むカード）</option>' + names.map((n) => "<option" + (n === m.cards.smbc ? " selected" : "") + ">" + esc(n) + "</option>").join("");
-  if (!names.includes(m.cards.smbc)) $("mCardSmbc").value = "";
+  Object.keys(MAIL_ISSUERS).forEach((k) => {                       // 発行元ごとの記録先カードの選択欄（id は mCard + 先頭大文字：mCardSmbc, mCardJcb）
+    const sel = $(mailPickId(k));
+    sel.innerHTML = '<option value="">自動（名前に「' + MAIL_ISSUERS[k].hint + '」を含むカード）</option>' + names.map((n) => "<option" + (n === m.cards[k] ? " selected" : "") + ">" + esc(n) + "</option>").join("");
+    if (!names.includes(m.cards[k])) sel.value = "";
+  });
   $("mailLast").textContent = m.last ? "前回：" + new Date(m.last).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) + (m.lastNote ? "（" + m.lastNote + "）" : "") : "";
   syncPickers();
 }
 $("openMail").onclick = () => { renderMail(); mailMsg(""); openOv("mailOverlay"); };
 $("mailRun").onclick = () => runMail(true);
 $("mailSeg").onclick = (e) => { const b = e.target.closest("[data-a]"); if (b) { state.mail.auto = b.dataset.a === "1"; save(); } };
-$("mCardSmbc").onchange = () => { state.mail.cards.smbc = $("mCardSmbc").value; save(); };
+Object.keys(MAIL_ISSUERS).forEach((k) => { $(mailPickId(k)).onchange = () => { state.mail.cards[k] = $(mailPickId(k)).value; save(); }; });
 $("mailUrl").onchange = () => {
   const v = $("mailUrl").value.trim();
   if (v && !MAIL_URL_RE.test(v)) { mailMsg("URLは「https://script.google.com/…/exec」の形です。コピーし直してください。"); $("mailUrl").value = state.mail.url; return; }

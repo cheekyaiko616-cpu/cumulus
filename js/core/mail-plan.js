@@ -3,10 +3,10 @@
 // 役割: 利用通知メールの明細を、すでにある記録と照らして「追加・重複・取込済み・要確認」に分け、記録に加える（通信と画面は features/mail.js）
 // 依存: util.js, guard.js, model.js, sample.js
 // 実行時: なし
-// 公開: MAIL_URL_RE, makeToken, mailReady, mailDays, validItem, safeStore, planImport, applyImport, planNote, matchMailEntry
+// 公開: MAIL_ISSUERS, MAIL_URL_RE, makeToken, mailReady, mailDays, validItem, safeStore, planImport, applyImport, planNote, matchMailEntry
 
 // 発行元の追加：ここに足し、Code.gs の ISSUERS にも同じ id で足す（README「カード会社を足すとき」）
-const MAIL_ISSUERS = { smbc: { name: "三井住友カード", hint: "三井住友" } };
+const MAIL_ISSUERS = { smbc: { name: "三井住友カード", hint: "三井住友" }, jcb: { name: "JCBカード", hint: "JCB" } };
 const MAIL_URL_RE = /^https:\/\/script\.google\.com\/(?:a\/macros\/[^\/]+\/|macros\/)s\/[\w-]+\/exec$/;   // 合言葉を送ってよい宛先は、これだけ
 const makeToken = () => { const a = new Uint8Array(24); crypto.getRandomValues(a); return [...a].map((x) => x.toString(16).padStart(2, "0")).join(""); };
 const mailReady = () => MAIL_URL_RE.test(state.mail.url) && !!state.mail.token;

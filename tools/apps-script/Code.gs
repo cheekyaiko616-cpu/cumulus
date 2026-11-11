@@ -2,7 +2,7 @@
  * Cumulus：カードの利用通知メールを読み取る小さなプログラム
  *
  * ・あなたのGoogleアカウントの中だけで動きます
- * ・読み取るのは、下の ISSUERS に書いた送信元の「ご利用のお知らせ」メールだけです
+ * ・読み取るのは、下の ISSUERS に書いた送信元（三井住友カード・JCB）の「ご利用のお知らせ」メールだけです
  * ・アプリに返すのは、日付・時刻・金額・利用先だけです（メールの本文は返しません）
  * ・TOKEN（合言葉）が一致しない呼び出しには、何も返しません
  */
@@ -12,7 +12,7 @@ const MAX_THREADS = 100;     // 一度に見るメールの上限
 
 const ISSUERS = [
   { id: "smbc", sender: "@vpass.ne.jp", query: 'from:statement@vpass.ne.jp subject:"ご利用のお知らせ"', parse: parseSmbc },
-  // JCB：メールの書式を確認でき次第、ここに追加します
+  { id: "jcb", sender: "@qa.jcb.co.jp", query: 'from:mail@qa.jcb.co.jp subject:"ご利用のお知らせ"', parse: parseJcb },
 ];
 
 function doGet(e) {
@@ -28,7 +28,8 @@ function doGet(e) {
         if (String(m.getFrom()).toLowerCase().indexOf(is.sender) < 0) return;   // 送信元が違うものは読まない
         if (m.getDate().getTime() < since) return;
         const got = is.parse(m.getSubject(), m.getPlainBody());
-        if (!got.length) { unreadable++; return; }
+        if (!got.length || got.skipped) unreadable++;            // 読めなかったもの（一部だけの場合も）は、通数で数える
+        if (!got.length) return;
                 got.forEach(function (g, i) { items.push(Object.assign({ id: m.getId() + (i ? "-" + i : ""), issuer: is.id }, g)); });
       });
     });
@@ -69,6 +70,42 @@ function parseSmbc(subject, body) {
       kind: kind,
       amount: Number(a[1].replace(/,/g, "")),
       cancel: /取消|取り消し|キャンセル|返品/.test(String(subject || "").normalize("NFKC") + seg)
+    });
+  });
+  return out;
+}
+
+// ---- JCBカード「ご利用のお知らせ」 ----
+// 例：【ご利用日時(日本時間)】 2026/11/11 15:16 ／ 【ご利用金額】 180円 ／ 【ご利用先】 アツプルドツトコム
+// 「▼」から後ろは注意書きなので読まない。金額が日本円の整数でないもの（外貨など）は、誤って読まないよう読み飛ばす
+function parseJcb(subject, body) {
+  const t = String(body || "").normalize("NFKC").replace(/\r/g, "");
+  const subj = String(subject || "").normalize("NFKC");
+  const re = /【ご利用日時[^】]*】/g;
+  const marks = [];
+  let m;
+  while ((m = re.exec(t))) marks.push(m.index);
+  const kind = /キャッシング/.test(subj) ? "キャッシング" : /ショッピング/.test(subj) ? "買物" : "その他";   // 買物でなければ、アプリは自動では記録しない（要確認）
+  const pad = function (n) { return ("0" + n).slice(-2); };
+  const out = [];
+  out.skipped = 0;
+  marks.forEach(function (at, i) {
+    let stop = i + 1 < marks.length ? marks[i + 1] : t.length;
+    const note = t.indexOf("▼", at);                          // 注意書き以降は読まない
+    if (note >= 0 && note < stop) stop = note;
+    const seg = t.slice(at, stop);
+    const d = seg.match(/【ご利用日時[^】]*】\s*(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/);
+    const a = seg.match(/【ご利用金額】\s*(\d[\d,]*)\s*円/);
+    const amount = a ? Number(a[1].replace(/,/g, "")) : 0;
+    if (!d || !a || !(amount > 0)) { out.skipped++; return; }
+    const s = seg.match(/【ご利用先】\s*([^\n【]*)/);
+    out.push({
+      date: d[1] + "-" + pad(d[2]) + "-" + pad(d[3]),
+      time: pad(d[4]) + ":" + d[5],
+      store: (s ? s[1].replace(/\s+/g, " ").trim() : "").slice(0, 60),
+      kind: kind,
+      amount: amount,
+      cancel: /取消|取り消し|キャンセル|返品/.test(subj + seg)
     });
   });
   return out;

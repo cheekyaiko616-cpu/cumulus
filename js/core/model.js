@@ -46,7 +46,7 @@ function normMail(m) {
     url: typeof m.url === "string" ? m.url.trim().slice(0, MAX_URL) : "",
     token: typeof m.token === "string" ? m.token.slice(0, MAX_TOKEN) : "",
     auto: m.auto !== false,                                       // 標準は「自動で記録する」
-    cards: { smbc: m.cards && typeof m.cards.smbc === "string" ? m.cards.smbc : "" },
+    cards: { smbc: m.cards && typeof m.cards.smbc === "string" ? m.cards.smbc : "", jcb: m.cards && typeof m.cards.jcb === "string" ? m.cards.jcb : "" },
     last: Number.isFinite(m.last) ? m.last : 0,
     lastNote: typeof m.lastNote === "string" ? m.lastNote.slice(0, MAX_NOTE) : "",
     seen: (Array.isArray(m.seen) ? m.seen : []).filter((x) => typeof x === "string").slice(-MAX_SEEN),   // 取り込み済みの目印（消した記録を再取り込みしないため）
