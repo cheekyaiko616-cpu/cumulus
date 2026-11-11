@@ -37,7 +37,7 @@ GitHub Pages でそのまま公開できる（ビルド不要）。記録はこ�
 - 作り直し：`pip install pillow numpy scipy scikit-image` のあと `python3 tools/make_icons.py`。`icons/` に書き出す
 - **どのアイコンも、背景は透過率100%（不透明度ちょうど0）**：`icons/icon-1024.png`（元データ）、`icon-512.png`・`icon-192.png`、`apple-touch-icon.png`（180px。ホーム画面用）、`favicon-32.png`。不透明な背景のアイコン（maskable）は置いていない
 - iPhoneのホーム画面：ホーム画面に追加するときに使われるのは `apple-touch-icon.png`。iOSは、WebアプリのアイコンのうちRGBで透明な部分を、黒などの背景にして表示することがある。「クリア」の見た目はiOSがこのアイコンから作り、アプリ側では指定できない。背景が黒く見えて困るときは `python3 tools/make_icons.py --opaque-apple` で、ホーム画面用だけを淡い緑（#dcebe5）の不透明な背景にして作り直せる
-- **使わなかった日の貯金箱はアプリアイコンの豚から作る**：カレンダー・凡例・日の画面の絵（`index.html` のスプライト `#i-saved`）は、アイコンの豚とコイン（雲と矢印は除く）をなぞって曲線にしたもの。線・豚・コインの3つの形で、色は `--ill-line` / `--ill-pig` / `--ill-coin`。作り直し：`python3 tools/make_saved_pig.py`（`pip install pillow numpy scipy scikit-image opencv-python-headless`）で `tools/icon-source/saved-pig.svg` ができるので、中身の `<symbol id="i-saved">…</symbol>` を `index.html` のスプライトと差し替える（アイコンを描き直したら、`make_icons.py` のあとにこれも実行する）
+- **使わなかった日の貯金箱はアプリアイコンの豚から作る**：カレンダー・凡例・日の画面の絵（`index.html` のスプライト `#i-saved`）は、アイコンの豚とコイン（雲と矢印は除く）をなぞって曲線にしたもの。線・豚・コインの3つの形（縁線は豚とコインの面を一定の幅だけ広げて作るので、面から浮かず太さも一定。足元の地面のような線は付けない）で、色は `--ill-line` / `--ill-pig` / `--ill-coin`。作り直し：`python3 tools/make_saved_pig.py`（`pip install pillow numpy scipy scikit-image opencv-python-headless`）で `tools/icon-source/saved-pig.svg` ができるので、中身の `<symbol id="i-saved">…</symbol>` を `index.html` のスプライトと差し替える（アイコンを描き直したら、`make_icons.py` のあとにこれも実行する）
 
 ## コードの分け方（決まり）
 読み込む順番は **core → ui → features → main**。下の層は、上の層を使わない。
