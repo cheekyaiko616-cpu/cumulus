@@ -1,9 +1,11 @@
 "use strict";
-// ===== 投資の記録（実際に投資した金額）と、月ごとの投資資金 =====
-const MAX_INV = 99999999;
-let editingInv = null;
+// ===== 投資の画面 =====
+// 役割: 実際に投資した金額の記録（入力・直す・消す）と、投資の画面（月・全期間・期間指定の累計、記録の一覧、月ごとの一覧）
+// 依存: util.js, guard.js, model.js, sample.js, stats.js, period.js, storage.js, dom.js, overlay.js, rows.js, range-input.js
+// 実行時: day.js
+// 公開: invMode, invAnchor, invFrom, invTo, openInv, renderMonthList, renderInvest
 
-const monthStats = (y, m) => rangeStats(ymd(y, m, 1), lastKey(y, m));
+let editingInv = null;
 function invItemHtml(v) {
   return '<button type="button" class="item" data-inv="' + esc(v.id) + '"><span class="l">📈 ' + mdLabel(v.date) + " " + (v.memo ? esc(v.memo) : "投資") + '</span><span class="r">' + yen(v.amount) + "</span></button>";
 }
@@ -35,7 +37,7 @@ $("invAdd").onclick = () => openInv(null, todayStr());
 $("iDate").onchange = updateSuggest;
 $("iSuggest").onclick = () => { $("iAmount").value = $("iSuggest").dataset.v; };
 $("iSave").onclick = () => {
-  const date = $("iDate").value, amount = Math.min(MAX_INV, toInt($("iAmount").value)), memo = $("iMemo").value.trim().slice(0, 60);
+  const date = $("iDate").value, amount = Math.min(MAX_INV, toInt($("iAmount").value)), memo = $("iMemo").value.trim().slice(0, MAX_MEMO);
   if (!isKey(date) || date < MIN_DATE) return toast("日付を入れてください");
   if (amount <= 0) return toast("投資した金額を入れてください");
   if (looksSensitive(memo)) return toast(SENSITIVE_MSG);
@@ -73,7 +75,6 @@ function renderMonthList() {
 }
 
 // ---- 投資の画面（月・全期間・期間指定） ----
-const monthRange = (k) => { const d = parseKey(k); return [ymd(d.getFullYear(), d.getMonth(), 1), lastKey(d.getFullYear(), d.getMonth())]; };
 let invMode = "month", invAnchor = todayStr();
 let [invFrom, invTo] = monthRange(todayStr());
 function invRange() {
@@ -83,11 +84,10 @@ function invRange() {
     return { from: lo, to: hi, label: "全期間" };
   }
   if (invMode === "custom") return { from: invFrom, to: invTo, label: "期間を指定" };
-  const [from, to] = monthRange(invAnchor), d = parseKey(invAnchor);
-  return { from, to, label: d.getFullYear() + "年" + (d.getMonth() + 1) + "月" };
+  return unitRange("month", invAnchor);
 }
 function renderInvest() {
-  $("invSeg").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.m === invMode));
+  setSeg($("invSeg"), (b) => b.dataset.m === invMode);
   $("invNav").hidden = invMode !== "month"; $("invCustom").hidden = invMode !== "custom";
   if (invMode === "custom") { $("ivFrom").value = invFrom; $("ivTo").value = invTo; }
   const r = invRange(), st = rangeStats(r.from, r.to), span = daysBetween(r.from, r.to) + 1;
@@ -98,12 +98,11 @@ function renderInvest() {
   $("invLeft").textContent = yenS(st.left);
   $("invSub").textContent = "使わなかった日 " + st.savedDays + "日 × " + yen(state.daily);
   const list = state.invests.filter((v) => v.date >= r.from && v.date <= r.to).sort((a, b) => a.date < b.date ? 1 : -1);
-  $("invList").innerHTML = list.length ? list.map(invItemHtml).join("") : '<div class="empty">この期間の投資の記録はありません</div>';
+  $("invList").innerHTML = list.length ? list.map(invItemHtml).join("") : emptyHtml("この期間の投資の記録はありません");
   renderMonthList();
 }
 $("invSeg").onclick = (e) => { const b = e.target.closest("[data-m]"); if (b) { invMode = b.dataset.m; renderInvest(); } };
-function moveInv(delta) { const d = parseKey(invAnchor); d.setMonth(d.getMonth() + delta, 1); invAnchor = dkey(d); renderInvest(); }
+const moveInv = (delta) => { invAnchor = shiftAnchor("month", invAnchor, delta); renderInvest(); };
 $("invPrev").onclick = () => moveInv(-1);
 $("invNext").onclick = () => moveInv(1);
-$("ivFrom").onchange = () => { const v = $("ivFrom").value; if (!isKey(v)) return renderInvest(); invFrom = v < MIN_DATE ? MIN_DATE : v; if (invTo < invFrom) invTo = invFrom; renderInvest(); };
-$("ivTo").onchange = () => { const v = $("ivTo").value; if (!isKey(v)) return renderInvest(); invTo = v < MIN_DATE ? MIN_DATE : v; if (invFrom > invTo) invFrom = invTo; renderInvest(); };
+bindCustomRange("ivFrom", "ivTo", () => [invFrom, invTo], (f, t) => { invFrom = f; invTo = t; }, renderInvest);

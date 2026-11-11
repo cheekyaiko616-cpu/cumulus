@@ -1,5 +1,10 @@
 "use strict";
-// ===== カレンダー =====
+// ===== カレンダー画面 =====
+// 役割: 月のカレンダー（使った金額・使わなかった日・引き落とし日の印）、月の移動（ボタン・左右スワイプ・年月の選択）、上の2つの数字
+// 依存: util.js, stats.js, billing.js, dom.js, overlay.js
+// 実行時: day.js
+// 公開: viewYear, viewMonth, amtText, renderCalendar, moveMonth
+
 let viewYear, viewMonth;
 // マスは幅が狭いので、10万円以上は「12.3万」と短くする
 const amtText = (n) => n >= 100000 ? (n / 10000).toFixed(n >= 1000000 ? 0 : 1).replace(/\.0$/, "") + "万" : comma(n);
@@ -37,7 +42,6 @@ function moveMonth(delta) {
 }
 $("prevM").onclick = () => moveMonth(-1);
 $("nextM").onclick = () => moveMonth(1);
-$("todayBtn").onclick = () => { const n = new Date(); viewYear = n.getFullYear(); viewMonth = n.getMonth(); sumAnchor = todayStr(); invAnchor = todayStr(); renderAll(); };
 $("calGrid").onclick = (e) => {
   const c = e.target.closest("[data-date]"); if (!c) return;
   if (c.dataset.other) { const [y, m] = c.dataset.date.split("-").map(Number); moveMonth((y - viewYear) * 12 + (m - 1 - viewMonth)); return; }
@@ -54,12 +58,8 @@ $("calGrid").onclick = (e) => {
   }, { passive: true });
 })();
 
-// ---- 年月を選ぶ（スマホでは選択欄が回転式の選び方で開く） ----
-(function () {
-  const y = $("pickY"), m = $("pickM");
-  for (let v = 2000; v <= 2099; v++) y.insertAdjacentHTML("beforeend", "<option>" + v + "</option>");
-  for (let v = 1; v <= 12; v++) m.insertAdjacentHTML("beforeend", "<option>" + v + "</option>");
-  $("monthLabel").onclick = () => { y.value = viewYear; m.value = viewMonth + 1; openOv("monthOverlay"); };
-  $("pickOk").onclick = () => { viewYear = Number(y.value); viewMonth = Number(m.value) - 1; closeOv("monthOverlay"); renderCalendar(); };
-})();
-
+// ---- 年月を選ぶ（選択欄は ui/picker.js） ----
+fillOptions("pickY", Array.from({ length: 100 }, (_, i) => [2000 + i, 2000 + i]));
+fillOptions("pickM", Array.from({ length: 12 }, (_, i) => [i + 1, i + 1]));
+$("monthLabel").onclick = () => { $("pickY").value = viewYear; $("pickM").value = viewMonth + 1; openOv("monthOverlay"); };
+$("pickOk").onclick = () => { viewYear = Number($("pickY").value); viewMonth = Number($("pickM").value) - 1; closeOv("monthOverlay"); renderCalendar(); };

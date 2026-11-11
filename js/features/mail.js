@@ -1,49 +1,16 @@
 "use strict";
-// ===== メールからの自動取り込み =====
-// あなたのGoogleアカウント内の小さなプログラム（tools/apps-script/Code.gs）が、三井住友カードの
-// 「ご利用のお知らせ」メールだけを読み、日付・時刻・金額・利用先だけをこのアプリに返す。
-// JCBは、メールの書式の見本が届いてから対応する（Code.gs の ISSUERS に足すだけで増やせる）
-const MAIL_URL_RE = /^https:\/\/script\.google\.com\/(?:a\/macros\/[^\/]+\/|macros\/)s\/[\w-]+\/exec$/;
-const MAIL_ISSUERS = { smbc: { name: "三井住友カード", hint: "三井住友" } };
+// ===== メールからの自動取り込み（通信と画面） =====
+// 役割: 連携のURLへ問い合わせて明細を取り、規則（core/mail-plan.js）で振り分けて記録する。アプリを開いたとき・戻ったときに、必要なときだけ調べる。設定画面・連携の準備・確認画面
+// 依存: util.js, model.js, mail-plan.js, gas-source.js, storage.js, dom.js, overlay.js, picker.js, rows.js
+// 実行時: なし
+// 公開: mailBlocked, mailTryAt, fetchMail, runMail, autoMail, renderMail
+
 const MAIL_EVERY = 30 * 60 * 1000;                                // 自動で調べる間隔の下限（30分）
 const MAIL_RETRY = 10 * 60 * 1000;                                // 失敗したあと、自動で試し直すまでの下限（10分）
 let mailBlocked = false, mailTryAt = 0;                          // mailBlocked：URLや合言葉の誤りで失敗したあとは、直るまで自動では試さない
+let mailBusy = false, mailPending = 0, mailItems = [];
 
-function normMail(m) {
-  m = m && typeof m === "object" ? m : {};
-  return {
-    url: typeof m.url === "string" ? m.url.trim().slice(0, 300) : "",
-    token: typeof m.token === "string" ? m.token.slice(0, 80) : "",
-    auto: m.auto !== false,                                       // 標準は「自動で記録する」
-    cards: { smbc: m.cards && typeof m.cards.smbc === "string" ? m.cards.smbc : "" },
-    last: Number.isFinite(m.last) ? m.last : 0,
-    lastNote: typeof m.lastNote === "string" ? m.lastNote.slice(0, 160) : "",
-    seen: (Array.isArray(m.seen) ? m.seen : []).filter((x) => typeof x === "string").slice(-1500),   // 取り込み済みの目印（消した記録を再取り込みしないため）
-  };
-}
-const makeToken = () => { const a = new Uint8Array(24); crypto.getRandomValues(a); return [...a].map((x) => x.toString(16).padStart(2, "0")).join(""); };
-const mailReady = () => MAIL_URL_RE.test(state.mail.url) && !!state.mail.token;
-
-// ---- どのカードの記録にするか ----
-function mailCardName(issuer) {
-  const want = state.mail.cards[issuer];
-  if (want && state.cards.some((c) => c.name === want)) return want;
-  const hit = state.cards.find((c) => c.name.indexOf(MAIL_ISSUERS[issuer].hint) >= 0);
-  return hit ? hit.name : "";
-}
-function ensureMailCard(issuer) {
-  let name = mailCardName(issuer);
-  if (!name) {                                                    // 登録がなければ、名前だけのカードを作る（引き落とし日は設定で直す）
-    name = MAIL_ISSUERS[issuer].name;
-    if (!state.cards.some((c) => c.name === name)) state.cards.push(makeCard(name));
-    state.mail.cards[issuer] = name;
-  }
-  return name;
-}
-
-// ---- 取得 ----
-// 何日前までのメールを見るか：前回から日が空いていても取りこぼさないよう、前回からの日数に余裕を足す
-const mailDays = () => state.mail.last ? Math.min(120, Math.max(14, Math.ceil((Date.now() - state.mail.last) / 86400000) + 14)) : 45;
+// ---- 取得（通信） ----
 async function fetchMail() {
   const m = state.mail;
   if (!mailReady()) throw new Error("setup");
@@ -61,47 +28,6 @@ async function fetchMail() {
     throw e;
   } finally { clearTimeout(timer); }
 }
-const validItem = (it) => !!it && !!MAIL_ISSUERS[it.issuer] && typeof it.id === "string" && it.id.length < 80 && isKey(it.date) && /^\d{2}:\d{2}$/.test(String(it.time)) &&
-  Number.isInteger(it.amount) && it.amount > 0 && it.amount <= MAX_PRICE;
-const safeStore = (s) => { s = String(s || "").trim().slice(0, 40); return looksSensitive(s) ? "" : s; };
-const seenKeys = (it) => ["m:" + it.id, "c:" + it.issuer + " " + it.date + " " + it.time + " " + it.amount];
-
-// ---- 重複の判定 ----
-// すでにある記録（手で入れたもの）と、同じカード・同じ金額・日付が前後1日以内なら「重複」。
-// 1件の記録には1通のメールだけが対応する（同じ日に同額を2回使った場合は、件数で数える）
-function planImport(items) {
-  const seen = new Set(state.mail.seen), used = new Set();
-  const plan = { add: [], dup: [], done: [], other: [] };
-  items.slice().sort((a, b) => (a.date + a.time + a.id) < (b.date + b.time + b.id) ? -1 : 1).forEach((it) => {
-    const keys = seenKeys(it);
-    if (keys.some((k) => seen.has(k))) { plan.done.push(it); return; }
-    if (it.cancel || (it.kind && it.kind !== "買物")) { plan.other.push(it); return; }   // 取消・買物以外は、自動では記録しない
-    const card = mailCardName(it.issuer), hint = MAIL_ISSUERS[it.issuer].hint;
-    const hit = state.entries
-      .filter((e) => e.pay === "credit" && e.src !== "mail" && !used.has(e) && e.total === it.amount && Math.abs(daysBetween(e.date, it.date)) <= 1 &&
-        (e.card === card || !e.card || (!card && e.card.indexOf(hint) >= 0)))
-      .sort((a, b) => Math.abs(daysBetween(a.date, it.date)) - Math.abs(daysBetween(b.date, it.date)))[0];
-    if (hit) { used.add(hit); plan.dup.push(it); return; }
-    plan.add.push(it);
-  });
-  return plan;
-}
-function applyImport(plan) {
-  if (!plan.add.length) return 0;
-  if (state.sample) leaveSample(state.cards.map((c) => c.name));  // 見本のまま取り込むと混ざるので、見本は消す
-  plan.add.forEach((it) => {
-    const store = safeStore(it.store);
-    state.entries.push({ id: "m" + Date.now() + Math.random().toString(36).slice(2, 7), date: it.date, store, pay: "credit", card: ensureMailCard(it.issuer),
-      items: [{ n: store || "ご利用", p: it.amount }], total: it.amount, src: "mail" });
-    seenKeys(it).forEach((k) => state.mail.seen.push(k));
-  });
-  state.mail.seen = state.mail.seen.slice(-1500);
-  return plan.add.length;
-}
-
-// ---- 実行 ----
-let mailBusy = false, mailPending = 0, mailItems = [];
-const planNote = (p, u) => "追加" + p.add.length + "件・重複" + p.dup.length + "件・取込済み" + p.done.length + "件" + (p.other.length ? "・要確認" + p.other.length + "件" : "") + (u ? "・読めなかったメール" + u + "通" : "");
 const mailErrText = (e) => ({
   setup: "まだ連携の準備ができていません。「連携の準備をする」から進めてください。",
   token: "合言葉が合いません。「連携の準備をする」でスクリプトをコピーし直し、貼り付け直してください。",
@@ -111,6 +37,7 @@ const mailErrText = (e) => ({
 }[e && e.message] || "接続できませんでした。通信状況とURLを確認してください。（このプレビュー画面からは接続できません。公開したアプリで使えます）");
 function mailMsg(t) { $("mailMsg").textContent = t || ""; }
 
+// ---- 実行 ----
 async function runMail(manual) {
   if (mailBusy) return;
   if (!mailReady()) { if (manual) mailMsg(mailErrText(new Error("setup"))); return; }
@@ -149,10 +76,10 @@ function autoMail() {
 document.addEventListener("visibilitychange", () => { if (!document.hidden) autoMail(); });
 
 // ---- 「確認してから記録」の画面 ----
-const pvRow = (it) => '<div class="deb"><span>' + mdLabel(it.date) + " " + esc(safeStore(it.store) || "ご利用") + (it.cancel ? "（取消）" : it.kind && it.kind !== "買物" ? "（" + esc(it.kind) + "）" : "") + '</span><b class="num">' + yen(it.amount) + "</b></div>";
+const pvRow = (it) => debRow(mdLabel(it.date) + " " + esc(safeStore(it.store) || "ご利用") + (it.cancel ? "（取消）" : it.kind && it.kind !== "買物" ? "（" + esc(it.kind) + "）" : ""), it.amount);
 function showPreview(plan, u) {
   const sec = (title, list) => list.length ? '<div class="subhead">' + title + "（" + list.length + "件）</div>" + list.map(pvRow).join("") : "";
-  $("mailPrevBody").innerHTML = (plan.add.length ? "" : '<div class="empty">新しく記録するものはありません</div>') +
+  $("mailPrevBody").innerHTML = (plan.add.length ? "" : emptyHtml("新しく記録するものはありません")) +
     sec("記録する", plan.add) + sec("重複のため記録しない", plan.dup) + sec("要確認（取消・買物以外のため自動では記録しません）", plan.other) +
     '<p class="hint">' + planNote(plan, u) + "</p>";
   $("mpOk").hidden = !plan.add.length; $("mpOk").textContent = plan.add.length + "件を記録する";
@@ -169,7 +96,7 @@ function renderMail() {
   $("mailSummary").textContent = !ready ? "未設定" : mailPending ? "新着" + mailPending + "件" : m.auto ? "自動で記録" : "確認して記録";
   $("mailState").textContent = ready ? "連携できています。" + (m.auto ? "アプリを開くと、新しい利用明細を自動で記録します。" : "アプリを開くと新着を調べ、確認してから記録します。") : "まだ連携していません。下の「連携の準備をする」から始めてください。";
   if (document.activeElement !== $("mailUrl")) $("mailUrl").value = m.url;
-  $("mailSeg").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", (b.dataset.a === "1") === m.auto));
+  setSeg($("mailSeg"), (b) => (b.dataset.a === "1") === m.auto);
   const names = state.cards.map((c) => c.name);
   $("mCardSmbc").innerHTML = '<option value="">自動（名前に「三井住友」を含むカード）</option>' + names.map((n) => "<option" + (n === m.cards.smbc ? " selected" : "") + ">" + esc(n) + "</option>").join("");
   if (!names.includes(m.cards.smbc)) $("mCardSmbc").value = "";

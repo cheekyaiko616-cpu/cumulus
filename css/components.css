@@ -1,3 +1,4 @@
+/* ===== 部品：切り替えボタン・カード・一覧の行・下のタブ・投資の画面・設定の項目・連携の案内 ===== */
 .seg { display: flex; background: var(--accent-soft); border-radius: 12px; padding: 3px; gap: 3px; }
 .seg button { flex: 1; border: 0; background: transparent; border-radius: 10px; min-height: 42px; padding: 6px 4px; font-weight: 700; font-size: 14px; line-height: 1.25; color: var(--accent); min-width: 0; }
 #paySeg button { font-size: 13px; }
@@ -32,9 +33,6 @@ nav.tabs button.add .ic { stroke-width: 2.6; }
 .span-line { text-align: center; font-size: 12px; color: var(--muted); margin-top: -6px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .chips button { border: 0; background: var(--accent-soft); color: var(--accent); border-radius: 10px; min-height: 38px; padding: 4px 12px; font-weight: 700; font-size: 13px; }
-.pay-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
-.pay-row:first-child { border-top: 0; }
-.pay-row small { display: block; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .paynote { margin-bottom: 8px; align-items: flex-start; }
 .paynote small { display: block; color: var(--muted); font-size: 12px; }
 .mrow { display: grid; grid-template-columns: 4.6em repeat(3, minmax(0, 1fr)); gap: 6px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--border); font-size: 14px; }

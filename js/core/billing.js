@@ -1,15 +1,11 @@
 "use strict";
-// ===== クレジットカードの請求（締め日と引き落とし日から、いつ・いくら引き落とされるかを求める） =====
-// カードの設定：close=締め日（0は月末）、months=引き落とし月（1=翌月、2=翌々月）、pay=引き落とし日（0は月末）
-const DEFAULT_CARD = { close: 0, pay: 27, months: 1 };          // 設定していないカードは「月末締め・翌月27日払い」として計算する
-const makeCard = (name) => Object.assign({ name }, DEFAULT_CARD);
+// ===== クレジットカードの請求 =====
+// 役割: 締め日と引き落とし日から、いつ・いくら引き落とされるかを求める（カード設定の形は model.js）
+// 依存: util.js, model.js
+// 実行時: なし
+// 公開: cardOf, cycleEnd, cycleStart, payDateOf, cardRuleText, pays, paysByDate, buildPayments, paysIn
+
 const cardOf = (name) => state.cards.find((c) => c.name === name) || makeCard(name);
-function normCard(c) {
-  if (typeof c === "string") return c ? makeCard(c) : null;      // 古い保存データ（名前だけ）にも対応
-  if (!c || typeof c.name !== "string" || !c.name) return null;
-  const num = (v, lo, hi, d) => Number.isInteger(v) && v >= lo && v <= hi ? v : d;
-  return { name: c.name, close: num(c.close, 0, 28, 0), pay: num(c.pay, 0, 28, 27), months: num(c.months, 1, 2, 1) };
-}
 // y年m月（mは0始まり。12以上や負の値は自動で年を繰り上げ・繰り下げ）のd日。d=0は月末
 function dayOf(y, m, d) {
   const t = new Date(y, m, 1), yy = t.getFullYear(), mm = t.getMonth(), last = new Date(yy, mm + 1, 0).getDate();

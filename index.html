@@ -125,7 +125,7 @@
 </div></nav>
 
 <!-- 日ごとの記録 -->
-<div class="overlay" id="dayOverlay" hidden><div class="sheet gutter" role="dialog" aria-modal="true" aria-labelledby="dayTitle">
+<div class="overlay" id="dayOverlay" data-backdrop hidden><div class="sheet gutter" role="dialog" aria-modal="true" aria-labelledby="dayTitle">
   <div class="sheet-head"><button class="sec" id="dayPrev" type="button" aria-label="前の日">‹</button><h2 id="dayTitle"></h2><button class="sec" id="dayNext" type="button" aria-label="次の日">›</button></div>
   <div id="dayBody"></div>
   <button class="primary" id="dayAdd" type="button">＋ この日の買い物を記録</button>
@@ -241,7 +241,7 @@
 </div></div>
 
 <!-- 年月を選ぶ -->
-<div class="overlay" id="monthOverlay" hidden><div class="sheet gutter" role="dialog" aria-modal="true" aria-labelledby="monthTitle">
+<div class="overlay" id="monthOverlay" data-backdrop hidden><div class="sheet gutter" role="dialog" aria-modal="true" aria-labelledby="monthTitle">
   <div class="sheet-head"><h2 id="monthTitle">年月を選ぶ</h2></div>
   <div class="two"><label class="f">年<select id="pickY" data-pick="年"></select></label><label class="f">月<select id="pickM" data-pick="月"></select></label></div>
   <div class="foot-btns"><button class="cancel" data-close="monthOverlay" type="button">キャンセル</button><button class="primary" id="pickOk" type="button">この月を表示</button></div>
@@ -256,11 +256,24 @@
 
 <div class="toast" id="toastEl" role="status" hidden></div>
 
+<!-- 読み込む順番：core（データと計算。画面に触れない）→ ui（画面の部品）→ features（画面ごと）→ main。各ファイル先頭の「依存」と合わせる（tools/check_structure.py が検査する） -->
 <script src="js/core/util.js"></script>
 <script src="js/core/guard.js"></script>
-<script src="js/core/storage.js"></script>
+<script src="js/core/model.js"></script>
+<script src="js/core/sample.js"></script>
 <script src="js/core/billing.js"></script>
+<script src="js/core/stats.js"></script>
+<script src="js/core/period.js"></script>
+<script src="js/core/mail-plan.js"></script>
+<script src="js/core/receipt-parse.js"></script>
+<script src="js/core/storage.js"></script>
 <script src="js/core/gas-source.js"></script>
+<script src="js/ui/dom.js"></script>
+<script src="js/ui/overlay.js"></script>
+<script src="js/ui/picker.js"></script>
+<script src="js/ui/sheet-swipe.js"></script>
+<script src="js/ui/rows.js"></script>
+<script src="js/ui/range-input.js"></script>
 <script src="js/features/calendar.js"></script>
 <script src="js/features/day.js"></script>
 <script src="js/features/edit.js"></script>
@@ -268,9 +281,8 @@
 <script src="js/features/invest.js"></script>
 <script src="js/features/summary.js"></script>
 <script src="js/features/settings.js"></script>
+<script src="js/features/cards.js"></script>
 <script src="js/features/mail.js"></script>
-<script src="js/ui/picker.js"></script>
-<script src="js/ui/sheet-swipe.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

@@ -1,5 +1,10 @@
 "use strict";
-// ===== 買い物の入力 =====
+// ===== 買い物の入力画面 =====
+// 役割: 買い物の記録の入力・直す・消す。クレジットのときの引き落とし日のお知らせと、メールで取り込み済みの同じ買い物との結び付け（レシートの二重登録を防ぐ）
+// 依存: util.js, guard.js, model.js, sample.js, billing.js, mail-plan.js, storage.js, dom.js, overlay.js
+// 実行時: day.js
+// 公開: editing, editPay, matchMode, rowHtml, readRows, updateTotal, setPay, updateCardHint, findMailMatch, updateMatch, openEdit
+
 let editing = null, editPay = "cash", matchMode = "same";
 function rowHtml(n, p) {
   return '<div class="row"><input type="text" class="n" placeholder="品目" aria-label="品目" autocomplete="off" enterkeyhint="next" value="' + esc(n || "") + '">' +
@@ -12,7 +17,7 @@ function readRows() {
 function updateTotal() { $("eTotal").textContent = yen(readRows().reduce((a, i) => a + i.p, 0)); updateMatch(); }
 function setPay(p) {
   editPay = p;
-  $("paySeg").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.pay === p));
+  setSeg($("paySeg"), (b) => b.dataset.pay === p);
   $("cardWrap").hidden = p !== "credit";
   updateCardHint();
 }
@@ -27,21 +32,17 @@ $("eCard").onchange = () => { updateCardHint(); updateMatch(); };
 $("eDate").onchange = () => { updateCardHint(); updateMatch(); };
 
 // ---- メールで取り込み済みの記録と同じ買い物か（レシートの二重登録を防ぐ） ----
-// 同じカード・同じ合計・日付が前後1日以内の、まだレシートと結び付いていないメールの記録を探す
+// 入力中の内容と同じ買い物の、メールの記録を探す（探し方は core/mail-plan.js の matchMailEntry）
 function findMailMatch() {
   if (editing || editPay !== "credit") return null;
-  const date = $("eDate").value, total = readRows().reduce((a, i) => a + i.p, 0), card = $("eCard").value;
-  if (!isKey(date) || total <= 0) return null;
-  return state.entries
-    .filter((e) => e.src === "mail" && !e.rc && e.pay === "credit" && e.total === total && Math.abs(daysBetween(e.date, date)) <= 1 && (!card || !e.card || e.card === card))
-    .sort((a, b) => Math.abs(daysBetween(a.date, date)) - Math.abs(daysBetween(b.date, date)) || (a.date < b.date ? -1 : 1))[0] || null;
+  return matchMailEntry($("eDate").value, readRows().reduce((a, i) => a + i.p, 0), $("eCard").value);
 }
 function updateMatch() {
   const hit = findMailMatch(), box = $("matchBox");
   box.hidden = !hit;
   if (!hit) return;
   $("matchText").textContent = "メールで取り込み済み：" + mdLabel(hit.date) + " " + (hit.store || "ご利用") + " " + yen(hit.total) + "。同じ買い物なら、この記録に反映します。";
-  $("matchSeg").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", (b.dataset.k === "same") === (matchMode === "same")));
+  setSeg($("matchSeg"), (b) => (b.dataset.k === "same") === (matchMode === "same"));
 }
 $("matchSeg").onclick = (e) => { const b = e.target.closest("[data-k]"); if (b) { matchMode = b.dataset.k; updateMatch(); } };
 function fillCards(sel) {

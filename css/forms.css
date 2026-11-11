@@ -1,10 +1,10 @@
+/* ===== 重ねて開く画面（入力・選択）と、入力欄・ボタン・メッセージ ===== */
 .overlay { position: fixed; inset: 0; z-index: 20; background: rgba(8,20,17,.5); display: flex; align-items: flex-end; justify-content: center; }
 .overlay[hidden] { display: none; }
-.sheet { background: var(--surface); width: 100%; max-width: 520px; max-height: 90%; overflow-y: auto; border-radius: 20px 20px 0 0; padding-block: 14px calc(18px + env(safe-area-inset-bottom, 0px)); animation: up .22s ease; display: flex; flex-direction: column; gap: 12px; }
+.sheet { background: var(--surface); width: 100%; max-width: 520px; max-height: 90%; overflow-y: auto; overscroll-behavior: contain; border-radius: 20px 20px 0 0; padding-block: 14px calc(18px + env(safe-area-inset-bottom, 0px)); animation: up .22s ease; display: flex; flex-direction: column; gap: 12px; }
 @keyframes up { from { transform: translateY(40px); opacity: .4; } }
 .sheet-head { display: flex; align-items: center; gap: 8px; }
 .sheet-head h2 { flex: 1; margin: 0; font-size: 17px; text-align: center; }
-.x { border: 0; background: var(--bg); border-radius: 10px; padding: 6px 12px; font-weight: 700; }
 label.f { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); font-weight: 700; min-width: 0; }
 input[type="text"], input[type="date"], select { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; min-height: 46px; padding: 8px 12px; font-size: 16px; line-height: 1.4; width: 100%; min-width: 0; color: var(--text); }
 input[type="date"] { -webkit-appearance: none; appearance: none; display: block; text-align: left; }
@@ -22,14 +22,11 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .danger-b { background: transparent; border: 1px solid var(--danger); color: var(--danger); border-radius: 12px; padding: 9px 12px; font-weight: 700; }
 .status { font-size: 13px; color: var(--muted); margin: 0; }
 .status:empty { display: none; }
-.cards-list { display: flex; flex-direction: column; }
-.inline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .toast { position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 30; background: var(--text); color: var(--bg); border-radius: 12px; padding: 8px 16px; font-size: 14px; font-weight: 700; max-width: calc(100% - 32px); }
 .sheet.has-foot { padding-bottom: 0; }
 .sheet-foot { position: sticky; bottom: 0; margin-top: auto; background: var(--surface); border-top: 1px solid var(--border); padding: 10px 0 calc(14px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 10px; }
 .sheet-foot .total { border-top: 0; padding-top: 0; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
-.sheet { overscroll-behavior: contain; }
 .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--border); align-self: center; flex-shrink: 0; margin-top: -6px; }
 .foot-btns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 10px; }
 .cancel { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 12px; min-height: 48px; padding: 10px; font-weight: 700; font-size: 16px; width: 100%; }

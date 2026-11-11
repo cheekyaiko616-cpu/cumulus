@@ -38,20 +38,97 @@ GitHub Pages でそのまま公開できる（ビルド不要）。記録はこ�
 - **どのアイコンも、背景は透過率100%（不透明度ちょうど0）**：`icons/icon-1024.png`（元データ）、`icon-512.png`・`icon-192.png`、`apple-touch-icon.png`（180px。ホーム画面用）、`favicon-32.png`。不透明な背景のアイコン（maskable）は置いていない
 - iPhoneのホーム画面：ホーム画面に追加するときに使われるのは `apple-touch-icon.png`。iOSは、WebアプリのアイコンのうちRGBで透明な部分を、黒などの背景にして表示することがある。「クリア」の見た目はiOSがこのアイコンから作り、アプリ側では指定できない。背景が黒く見えて困るときは `python3 tools/make_icons.py --opaque-apple` で、ホーム画面用だけを淡い緑（#dcebe5）の不透明な背景にして作り直せる
 
+## コードの分け方（決まり）
+読み込む順番は **core → ui → features → main**。下の層は、上の層を使わない。
+
+| 層 | 置き場所 | 役割 | 決まり |
+|---|---|---|---|
+| core | `js/core/` | データと計算 | **画面（DOM）に触れない**。保存したあとの画面の更新は、`storage.js` の `onSaved` に `main.js` が入れた処理が行う |
+| ui | `js/ui/` | 画面の部品（開閉・選択欄・スワイプ・一覧の行・入力欄） | 業務のルールを持たない。core は使ってよい |
+| features | `js/features/` | 画面・機能ごと（1ファイル＝1画面または1機能） | 画面の描画と操作のつなぎだけ。ルールは core に置く |
+| main | `js/main.js` | タブの切り替え・見えている画面だけを描く仕組み・起動・画面どうしをつなぐ操作 | 一番上 |
+
+- 各ファイルの先頭に、**役割・依存・実行時・公開** を書く。`依存`＝先に読み込まれている必要があるファイル、`実行時`＝ボタンを押したときなど、実行中にだけ呼ぶファイル、`公開`＝他のファイルから使われる名前
+- データの形・上限・初期値・読み込み時の点検は `js/core/model.js` だけに置く（保存データの形を変えるときは、`STATE_VERSION` を上げて `migrate()` で古い形を直す）
+- 画面を使わない計算（日付・集計・請求・期間・メールの振り分け・レシートの解析）は core に置き、画面の処理は ui か features に置く
+- **`python3 tools/check_structure.py` が、この決まりを検査する**（エラーが0であること）。検査する内容：
+  - `js/` の全ファイルが `index.html` に書かれていること（逆も）
+  - 先頭の説明があり、`依存` の順番どおりに読み込まれ、使っているファイルが `依存`／`実行時` に書かれていること
+  - 下の層が上の層を使っていないこと／core が画面に触れていないこと
+  - `公開` の名前が実在し、他のファイルから使われている名前が漏れなく書かれていること
+  - 同じ名前を複数のファイルで定義していないこと
+  - CSS で使う変数がすべて定義されていること（注意：使われていない class・変数・関数、重複した選択子）
+  - `--report` をつけると、ファイル数・行数・重複・未使用の数を出す
+
 ## ファイル構成
 ```
-index.html                 画面の骨組み（読み込む順番もここ）
-css/                       見た目（基本・カレンダー・部品・入力画面）
-js/core/                   データと計算（共通の道具・番号の防止・保存と集計・カード請求・スクリプトの写し）
-js/features/               画面・機能ごと（カレンダー・日ごと・入力・レシート・投資・まとめ・設定・メール）
-js/ui/                     共通の動き（選択欄・下スワイプで閉じる）
-js/main.js                 タブの切り替え・起動
-tools/build.py             動作確認用に1ファイルへまとめる
-tools/apps-script/Code.gs  メールを読むGoogleアカウント内のプログラム
-tools/make_gas_source.py   Code.gs をアプリ内の「スクリプトをコピー」用に写す
-tools/make_icons.py        スケッチからアイコン一式を作る（元の絵は tools/icon-source/）
+index.html                    画面の骨組みと、script を読み込む順番
+css/base.css                  色（明るい・暗い）・全体の土台・ヘッダー・画面の骨組み
+css/calendar.css              カレンダー画面（1画面に収める調整を含む）
+css/components.css            部品（切り替えボタン・カード・一覧の行・下のタブ・投資の画面・設定の項目）
+css/forms.css                 重ねて開く画面・入力欄・ボタン・メッセージ・選択欄
+js/core/util.js               日付・金額・文字の小さな関数
+js/core/guard.js              カード番号のような長い数字を見つける
+js/core/model.js              データの定義（形・上限・初期値・点検・読み込み時の整え）
+js/core/sample.js             見本のデータ／見本を消す
+js/core/billing.js            クレジットの締め日・引き落とし日の計算
+js/core/stats.js              日付ごとの索引・使った金額・使わなかった日・投資資金の集計
+js/core/period.js             週・月・年・期間指定の範囲の計算
+js/core/mail-plan.js          メール明細の振り分け（追加・重複・取込済み・要確認）とレシートとの結び付け
+js/core/receipt-parse.js      レシートの文字から品目・金額・日付を取り出す
+js/core/storage.js            ブラウザの保存領域への読み書き
+js/core/gas-source.js         （自動で作る）Code.gs の写し。直接は直さない
+js/ui/dom.js                  要素の取得・選択欄の中身・切り替えボタンの表示
+js/ui/overlay.js              重ねて開く画面の開閉・2回押しで確定・メッセージ・Escape
+js/ui/picker.js               プルダウンの代わりの選択欄
+js/ui/sheet-swipe.js          下へスワイプして画面を閉じる
+js/ui/rows.js                 一覧の行（買い物・金額つきの行・「ありません」）
+js/ui/range-input.js          開始日・終了日の入力欄（まとめと投資で共通）
+js/features/calendar.js       カレンダー画面
+js/features/day.js            日ごとの画面
+js/features/edit.js           買い物の入力画面（メール記録との結び付けを含む）
+js/features/receipt.js        レシートの写真の読み取り
+js/features/invest.js          投資の画面と、投資の入力画面
+js/features/summary.js        まとめ画面
+js/features/settings.js       設定（1日あたりの金額・数え始める日・データを消す）
+js/features/cards.js          クレジットカードの一覧・設定・次の引き落とし
+js/features/mail.js           メール連携（通信・設定・確認の画面）
+js/main.js                    タブ・描画の仕組み・日付の更新・起動
+tools/build.py                動作確認用に1ファイルへまとめる
+tools/check_structure.py      コードの分け方の検査
+tools/apps-script/Code.gs     メールを読む、Googleアカウント内のプログラム
+tools/make_gas_source.py      Code.gs をアプリ内の「スクリプトをコピー」用に写す
+tools/make_icons.py           スケッチからアイコン一式を作る（元の絵は tools/icon-source/）
 icons/, manifest.webmanifest  ホーム画面用のアイコンと設定
 ```
+
+## 保存データの形
+ブラウザの `localStorage`（キー `tameru-calendar-v1`。アプリ名を変えても変えない）に、JSONで1つ保存する。読み込むときは `model.js` の `normalize()` が点検し、壊れた項目は捨てる（知らない項目も保存されない）。
+
+| 項目 | 内容 | 型 | 書くところ |
+|---|---|---|---|
+| `v` | 保存データの版 | 数 | model.js |
+| `daily` | 使わなかった日1日あたりの投資資金（円） | 数（0〜1,000,000） | features/settings.js |
+| `start` | 数え始める日 | `"YYYY-MM-DD"` | features/settings.js、core/sample.js |
+| `sample` | 見本のデータか | 真偽 | core/sample.js |
+| `cards[]` | カード：`name` 名前、`close` 締め日（0=月末）、`pay` 引き落とし日（0=月末）、`months` 引き落とし月（1=翌月・2=翌々月） | 配列（30件まで） | features/cards.js、core/mail-plan.js |
+| `entries[]` | 買い物：`id`、`date`、`store`、`pay`（cash／code／credit）、`card`、`items[{n,p}]`、`total`、`src`（`"mail"`＝メール由来）、`rc`（レシートと結び付いたか） | 配列 | features/edit.js、core/mail-plan.js |
+| `invests[]` | 投資：`id`、`date`、`amount`、`memo` | 配列 | features/invest.js |
+| `mail` | メール連携：`url`、`token`（合言葉）、`auto`、`cards.smbc`（記録先のカード名）、`last`（前回の確認の時刻）、`lastNote`、`seen[]`（取り込み済みの目印。1,500件まで） | 辞書 | features/mail.js、core/mail-plan.js |
+
+## カード会社を足すとき（メール連携）
+1. `tools/apps-script/Code.gs` の `ISSUERS` に、送信元・検索条件・読み取りの関数を足す（`id` を決める）
+2. `python3 tools/make_gas_source.py` を実行して、アプリ内の写しを更新する
+3. `js/core/mail-plan.js` の `MAIL_ISSUERS` に、同じ `id` で名前（`name`）と、カード名に含まれる言葉（`hint`）を足す
+4. `js/core/model.js` の `normMail` の `cards` に、`id` の項目を足し、`features/mail.js` の設定画面に、記録先のカードの選択欄を足す
+5. `python3 tools/check_structure.py` と試験を実行する
+
+## つかいかた（作業用）
+- 公開：リポジトリをそのまま GitHub Pages に置く（ビルド不要）
+- `python3 tools/build.py` … 動作確認用に、`dist/preview.html` へ1ファイルにまとめる（`--fragment` で共有ページ用の形）
+- `python3 tools/check_structure.py [--report]` … コードの分け方の検査
+- `python3 tools/make_gas_source.py` … `Code.gs` を直したあとに実行
+- `python3 tools/make_icons.py [--opaque-apple]` … アイコンの作り直し
 
 ## 電池への配慮（すべてのコードに適用する決まり）
 - 定期的に動くタイマーを置かない。日付が変わったときの更新は、次の0時に1回だけ動くタイマー（画面が見えていない間は止める）

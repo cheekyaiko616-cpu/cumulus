@@ -1,5 +1,9 @@
 "use strict";
 // ===== 下に向かってスワイプすると、重なった画面を閉じる =====
+// 役割: 重なった画面を、下へ引っぱって閉じる。引っぱれる目印の線も付ける
+// 依存: overlay.js
+// 実行時: なし
+// 公開: なし
 // 画面の一番上にいるときだけ動く（中身をスクロールしているときは、ふつうのスクロール）
 document.querySelectorAll(".overlay > .sheet").forEach((sheet) => {
   const id = sheet.parentElement.id;

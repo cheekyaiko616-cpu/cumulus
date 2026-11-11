@@ -1,7 +1,12 @@
 "use strict";
 // ===== 画面（タブ）の切り替え・起動 =====
+// 役割: タブの切り替え、見えている画面だけを描く仕組み、保存したあとの描き直し、日付が変わったときの更新、各画面をつなぐ操作（今日・一覧の行を押す）、起動
+// 依存: util.js, model.js, storage.js, stats.js, dom.js, calendar.js, invest.js, summary.js, settings.js, cards.js, mail.js
+// 実行時: edit.js
+// 公開: RENDER, tab, dirty, showTab, renderAll, lastToday, midnightTimer, refreshIfNewDay, scheduleMidnight
+
 const TITLES = { invest: "投資", summary: "まとめ", settings: "設定" };
-const RENDER = { calendar: renderCalendar, invest: renderInvest, summary: renderSummary, settings: () => { renderSettings(); renderMail(); } };
+const RENDER = { calendar: renderCalendar, invest: renderInvest, summary: renderSummary, settings: () => { renderSettings(); renderCards(); renderMail(); } };
 let tab = "calendar";
 const dirty = new Set(Object.keys(RENDER));                         // 描き直しが必要な画面。見えていない画面は、開くまで描かない（電池の節約）
 const renderTab = (t) => { if (dirty.delete(t)) RENDER[t](); };
@@ -26,14 +31,20 @@ function renderAll() {
   Object.keys(RENDER).forEach((t) => dirty.add(t));
   renderTab(tab);
 }
-let toastT = 0;
-function toast(msg) {
-  const t = $("toastEl"); t.textContent = msg; t.hidden = false;
-  clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2400);
-}
-document.addEventListener("keydown", (e) => { if (e.key === "Escape" && openStack.length) closeOv(openStack[openStack.length - 1]); });
+onSaved = () => renderAll();                                       // 保存したあとは、見えている画面を描き直す（storage.js の save が呼ぶ）
 
-// 日付が変わったら（開いたままにしていた場合）、今日に合わせて表示し直す
+// ---- 画面をつなぐ操作 ----
+// 「今日」：カレンダー・まとめ・投資の表示を、今日の月に戻す
+$("todayBtn").onclick = () => { const n = new Date(); viewYear = n.getFullYear(); viewMonth = n.getMonth(); sumAnchor = todayStr(); invAnchor = todayStr(); renderAll(); };
+// 一覧の行を押したら、買い物・投資の入力画面で直す
+document.addEventListener("click", (e) => {
+  const iv = e.target.closest("[data-inv]");
+  if (iv) { const v = state.invests.find((x) => x.id === iv.dataset.inv); if (v) openInv(v); return; }
+  const en = e.target.closest("[data-entry]");
+  if (en) { const ent = state.entries.find((x) => x.id === en.dataset.entry); if (ent) openEdit(ent); }
+});
+
+// ---- 日付が変わったら（開いたままにしていた場合）、今日に合わせて表示し直す ----
 // 1分ごとの確認はしない。次の0時に1回だけ動くタイマーを置き、画面が見えていない間は止める
 let lastToday = todayStr(), midnightTimer = 0;
 function refreshIfNewDay() {
@@ -50,6 +61,7 @@ function scheduleMidnight() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) clearTimeout(midnightTimer); else { refreshIfNewDay(); scheduleMidnight(); } });
 scheduleMidnight();
 
+// ---- 起動 ----
 state = load(); reindex();
 { const n = new Date(); viewYear = n.getFullYear(); viewMonth = n.getMonth(); }
 renderAll();

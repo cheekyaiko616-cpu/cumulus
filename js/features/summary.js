@@ -1,31 +1,19 @@
 "use strict";
-// ===== まとめ（週・月・年・期間指定。標準は「月」） =====
+// ===== まとめ画面 =====
+// 役割: 週・月・年・期間指定（標準は月）の、使った金額・投資資金・支払い方法ごとの内訳・クレジットの引き落とし・買い物の一覧
+// 依存: util.js, model.js, stats.js, billing.js, period.js, dom.js, rows.js, range-input.js
+// 実行時: なし
+// 公開: period, sumAnchor, customFrom, customTo, renderSummary
+
 let period = "month", sumAnchor = todayStr();
-// 期間指定の初期値と、早押しボタンの範囲
-function presetRange(name) {
-  const t = todayStr(), d = parseKey(t), y = d.getFullYear(), m = d.getMonth();
-  if (name === "last") { const p = new Date(y, m - 1, 1); return [ymd(p.getFullYear(), p.getMonth(), 1), lastKey(p.getFullYear(), p.getMonth())]; }
-  if (name === "d30") return [addDays(t, -29), t];
-  if (name === "year") return [ymd(y, 0, 1), ymd(y, 11, 31)];
-  if (name === "all") return [state ? state.start : t, t];
-  return [ymd(y, m, 1), lastKey(y, m)];                          // 今月
-}
 let [customFrom, customTo] = presetRange("month");
 
 function periodRange() {
   if (period === "custom") return { from: customFrom, to: customTo, label: "期間を指定" };
-  const d = parseKey(sumAnchor), y = d.getFullYear(), m = d.getMonth();
-  if (period === "week") { const from = addDays(sumAnchor, -d.getDay()), to = addDays(from, 6); return { from, to, label: mdLabel(from) + " 〜 " + mdLabel(to) }; }
-  if (period === "year") return { from: ymd(y, 0, 1), to: ymd(y, 11, 31), label: y + "年" };
-  return { from: ymd(y, m, 1), to: lastKey(y, m), label: y + "年" + (m + 1) + "月" };
-}
-function movePeriod(delta) {
-  const d = parseKey(sumAnchor);
-  if (period === "week") d.setDate(d.getDate() + 7 * delta); else if (period === "year") d.setFullYear(d.getFullYear() + delta, d.getMonth(), 1); else d.setMonth(d.getMonth() + delta, 1);
-  sumAnchor = dkey(d); renderSummary();
+  return unitRange(period, sumAnchor);
 }
 function renderSummary() {
-  $("periodSeg").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.p === period));
+  setSeg($("periodSeg"), (b) => b.dataset.p === period);
   $("navRow").hidden = period === "custom"; $("customBox").hidden = period !== "custom";
   if (period === "custom") { $("cFrom").value = customFrom; $("cTo").value = customTo; }
   const r = periodRange(), st = rangeStats(r.from, r.to), span = daysBetween(r.from, r.to) + 1;
@@ -39,16 +27,15 @@ function renderSummary() {
   const groups = {};
   list.forEach((e) => { const k = payLabel(e); (groups[k] = groups[k] || { sum: 0, color: payColor(e) }).sum += e.total; });
   const rows = Object.entries(groups).sort((a, b) => b[1].sum - a[1].sum), max = rows.length ? rows[0][1].sum : 0;
-  $("payBars").innerHTML = rows.length ? rows.map(([k, g]) => '<div class="bar-row"><span class="nm">' + esc(k) + '</span><span class="bar"><i style="width:' + (g.sum / max * 100).toFixed(1) + "%;background:" + g.color + '"></i></span><b class="num">' + yen(g.sum) + "</b></div>").join("") : '<div class="empty">この期間の買い物はありません</div>';
+  $("payBars").innerHTML = rows.length ? rows.map(([k, g]) => '<div class="bar-row"><span class="nm">' + esc(k) + '</span><span class="bar"><i style="width:' + (g.sum / max * 100).toFixed(1) + "%;background:" + g.color + '"></i></span><b class="num">' + yen(g.sum) + "</b></div>").join("") : emptyHtml("この期間の買い物はありません");
   // この期間に引き落とし日が来るカード代（支払い方法の下に小さく添える）
   const pl = paysIn(r.from, r.to);
-  $("payDeb").innerHTML = pl.length ? '<div class="subhead">クレジットの引き落とし</div>' + pl.map((p) => '<div class="deb"><span>' + mdLabel(p.date) + " " + esc(p.card) + '</span><b class="num">' + yen(p.amount) + "</b></div>").join("") : "";
-  $("periodList").innerHTML = list.length ? list.map((e) => entryHtml(e, true)).join("") : '<div class="empty">この期間の買い物はありません</div>';
+  $("payDeb").innerHTML = pl.length ? '<div class="subhead">クレジットの引き落とし</div>' + pl.map((p) => debRow(mdLabel(p.date) + " " + esc(p.card), p.amount)).join("") : "";
+  $("periodList").innerHTML = list.length ? list.map((e) => entryHtml(e, true)).join("") : emptyHtml("この期間の買い物はありません");
 }
 $("periodSeg").onclick = (e) => { const b = e.target.closest("[data-p]"); if (b) { period = b.dataset.p; renderSummary(); } };
+const movePeriod = (delta) => { sumAnchor = shiftAnchor(period, sumAnchor, delta); renderSummary(); };
 $("prevP").onclick = () => movePeriod(-1);
 $("nextP").onclick = () => movePeriod(1);
-// 期間指定：開始日が終了日より後になったら終了日を合わせる（逆も同じ）
-$("cFrom").onchange = () => { const v = $("cFrom").value; if (!isKey(v)) return renderSummary(); customFrom = v < MIN_DATE ? MIN_DATE : v; if (customTo < customFrom) customTo = customFrom; renderSummary(); };
-$("cTo").onchange = () => { const v = $("cTo").value; if (!isKey(v)) return renderSummary(); customTo = v < MIN_DATE ? MIN_DATE : v; if (customFrom > customTo) customFrom = customTo; renderSummary(); };
-$("presetChips").onclick = (e) => { const b = e.target.closest("[data-preset]"); if (b) { [customFrom, customTo] = presetRange(b.dataset.preset); renderSummary(); } };
+bindCustomRange("cFrom", "cTo", () => [customFrom, customTo], (f, t) => { customFrom = f; customTo = t; }, renderSummary);
+$("presetChips").onclick = (e) => { const b = e.target.closest("[data-preset]"); if (b) { [customFrom, customTo] = presetRange(b.dataset.preset, state.start); renderSummary(); } };
