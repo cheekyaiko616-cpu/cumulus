@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#174f42">
+<title>Cumulus</title>
+<meta name="application-name" content="Cumulus">
+<meta name="apple-mobile-web-app-title" content="Cumulus">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/calendar.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/forms.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10.5h17M8 3v4M16 3v4"/><circle cx="8.5" cy="14.8" r=".9" fill="currentColor"/><circle cx="12" cy="14.8" r=".9" fill="currentColor"/><circle cx="15.5" cy="14.8" r=".9" fill="currentColor"/></symbol>
+<symbol id="i-invest" viewBox="0 0 24 24"><path d="M3.5 17.5l5.5-5.5 4 4 7.5-8.5"/><path d="M14.5 7.5h6v6"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-pie" viewBox="0 0 24 24"><path d="M11 3.6a8.6 8.6 0 1 0 9.4 9.4H11z"/><path d="M14.2 3.9a8.6 8.6 0 0 1 5.9 5.9h-5.9z"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><circle cx="12" cy="12" r="6.6"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></symbol>
+</defs></svg>
+
+<header class="gutter"><div class="col">
+  <h1 id="pageTitle" hidden></h1>
+  <button class="hbtn cal-only" id="prevM" type="button" aria-label="前の月">‹</button>
+  <button class="pill num cal-only" id="monthLabel" type="button" aria-label="年月を選ぶ"></button>
+  <button class="hbtn cal-only" id="nextM" type="button" aria-label="次の月">›</button>
+  <span class="sp"></span>
+  <button class="ghost" id="todayBtn" type="button">今日</button>
+</div></header>
+
+<main class="gutter" id="main"><div class="col">
+  <div class="warnbar" id="storeWarn" role="alert" hidden>この環境では記録を保存できません。ブラウザの設定（プライベートモードなど）を確認してください。</div>
+  <div class="sample" id="sampleBar" hidden><span>見本のデータです</span><button id="sampleClear" type="button">消して始める</button></div>
+
+  <section class="view" id="view-calendar">
+    <div class="figs compact">
+      <div class="fig"><div class="lab" id="mSpentLab"></div><div class="val" id="mSpent"></div><div class="sub" id="mSpentSub"></div></div>
+      <button class="fig invest" id="goInvest" type="button" aria-label="投資の画面を開く"><div class="lab" id="mInvestLab"></div><div class="val" id="mInvest"></div><div class="sub" id="mInvestSub"></div></button>
+    </div>
+    <div class="cal" id="calWrap">
+      <div class="weekdays"><div class="sun">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div></div>
+      <div class="grid" id="calGrid" style="margin-top:4px"></div>
+      <div class="legend"><span><span class="bag" aria-hidden="true">💰</span>使わなかった日</span><span><span aria-hidden="true">💳</span>カード引き落とし日</span></div>
+    </div>
+  </section>
+
+  <section class="view" id="view-invest" hidden>
+    <div class="seg" id="invSeg"><button type="button" data-m="month">月</button><button type="button" data-m="all">全期間</button><button type="button" data-m="custom">期間指定</button></div>
+    <div class="nav" id="invNav"><button class="sec" id="invPrev" type="button" aria-label="前の月">‹</button><div class="t" id="invLabel"></div><button class="sec" id="invNext" type="button" aria-label="次の月">›</button></div>
+    <div class="card" id="invCustom" hidden>
+      <div class="two">
+        <label class="f">開始日<input type="date" id="ivFrom" min="2000-01-01"></label>
+        <label class="f">終了日<input type="date" id="ivTo" min="2000-01-01"></label>
+      </div>
+    </div>
+    <div class="span-line" id="invSpan"></div>
+    <div class="hero-inv">
+      <div class="lab">貯まった投資資金</div><div class="val" id="invHero"></div>
+      <div class="hero-rows"><div><span>投資した金額</span><b class="num" id="invDone"></b></div><div><span>未投資の残り</span><b class="num" id="invLeft"></b></div></div>
+      <div class="sub" id="invSub"></div>
+    </div>
+    <button class="primary" id="invAdd" type="button">＋ 投資を記録</button>
+    <div class="card"><h2>投資の記録</h2><div id="invList"></div></div>
+    <div class="card"><h2>月ごとの投資資金</h2><div id="monthList"></div><p class="hint">月が替わると、今月分は0円から始まります。先月以前の分は、この一覧に残ります。</p></div>
+  </section>
+
+  <section class="view" id="view-summary" hidden>
+    <div class="seg" id="periodSeg"><button type="button" data-p="week">週</button><button type="button" data-p="month">月</button><button type="button" data-p="year">年</button><button type="button" data-p="custom">期間指定</button></div>
+    <div class="nav" id="navRow"><button class="sec" id="prevP" type="button" aria-label="前の期間">‹</button><div class="t" id="periodLabel"></div><button class="sec" id="nextP" type="button" aria-label="次の期間">›</button></div>
+    <div class="card" id="customBox" hidden>
+      <div class="two">
+        <label class="f">開始日<input type="date" id="cFrom" min="2000-01-01"></label>
+        <label class="f">終了日<input type="date" id="cTo" min="2000-01-01"></label>
+      </div>
+      <div class="chips" id="presetChips"><button type="button" data-preset="month">今月</button><button type="button" data-preset="last">先月</button><button type="button" data-preset="d30">直近30日</button><button type="button" data-preset="year">今年</button></div>
+    </div>
+    <div class="span-line" id="periodSpan"></div>
+    <div class="figs">
+      <div class="fig"><div class="lab">使った金額</div><div class="val" id="pSpent"></div><div class="sub" id="pSpentSub"></div></div>
+      <div class="fig invest"><div class="lab">貯まった投資資金</div><div class="val" id="pInvest"></div><div class="sub" id="pInvestSub"></div></div>
+    </div>
+    <div class="card"><h2>支払い方法ごと</h2><div id="payBars"></div><div id="payDeb"></div></div>
+    <div class="card"><h2>この期間の記録</h2><div id="periodList"></div></div>
+  </section>
+
+  <section class="view" id="view-settings" hidden>
+    <div class="card">
+      <h2>投資資金のルール</h2>
+      <div class="two">
+        <label class="f">1日あたりの金額（円）<input type="text" id="setDaily" inputmode="numeric" autocomplete="off"></label>
+        <label class="f">数え始める日<input type="date" id="setStart" min="2000-01-01"></label>
+      </div>
+      <p class="hint">数え始める日から昨日までで、買い物の記録が1件もない日を「使わなかった日」として数えます。今日の分は日付が変わってから加わります。</p>
+    </div>
+    <div class="card menu-card">
+      <button class="menu-row" id="openCards" type="button"><span>クレジットカード</span><span class="menu-r" id="cardsSummary"></span><span class="chev" aria-hidden="true">›</span></button>
+      <button class="menu-row" id="openMail" type="button"><span>メールから自動取り込み</span><span class="menu-r" id="mailSummary"></span><span class="chev" aria-hidden="true">›</span></button>
+    </div>
+    <div class="card">
+      <h2>データ</h2>
+      <button class="danger-b" id="wipeBtn" type="button">すべての記録を消す</button>
+      <p class="hint">記録はこの端末の中だけに保存され、外へは送りません。レシートの写真も保存しません（読み取った文字から品目と金額だけを残します）。</p>
+    </div>
+    <p class="about"><b>Cumulus</b><span>使わなかった日を積み重ねる、家計簿と投資のアプリ</span></p>
+  </section>
+</div></main>
+
+<nav class="tabs gutter" aria-label="画面の切り替え"><div class="col">
+  <button type="button" data-tab="calendar" aria-label="カレンダー" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-cal"/></svg></button>
+  <button type="button" data-tab="invest" aria-label="投資"><svg class="ic" aria-hidden="true"><use href="#i-invest"/></svg></button>
+  <button type="button" class="add" id="addBtn" aria-label="買い物を記録"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>
+  <button type="button" data-tab="summary" aria-label="まとめ"><svg class="ic" aria-hidden="true"><use href="#i-pie"/></svg></button>
+  <button type="button" data-tab="settings" aria-label="設定"><svg class="ic" aria-hidden="true"><use href="#i-gear"/></svg></button>
+</div></nav>
+
+<!-- 日ごとの記録 -->
+<div class="overlay" id="dayOverlay" hidden><div class="sheet gutter" role="dialog" aria-modal="true" aria-labelledby="dayTitle">
+  <div class="sheet-head"><button class="sec" id="dayPrev" type="button" aria-label="前の日">‹</button><h2 id="dayTitle"></h2><button class="sec" id="dayNext" type="button" aria-label="次の日">›</button></div>
+  <div id="dayBody"></div>
+  <button class="primary" id="dayAdd" type="button">＋ この日の買い物を記録</button>
+  <button class="cancel" data-close="dayOverlay" type="button">閉じる</button>
+</div></div>
+
+<!-- 買い物の入力 -->
+<div class="overlay" id="editOverlay" hidden><div class="sheet has-foot gutter" id="editSheet" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+  <div class="sheet-head"><h2 id="editTitle" style="text-align:left">買い物を記録</h2></div>
+  <button class="dashed" id="receiptBtn" type="button">レシートを撮影／写真から読み取る</button>
+  <input type="file" id="receiptFile" accept="image/*" hidden>
+  <p class="status" id="ocrStatus" role="status"></p>
+  <p class="hint" style="margin-top:-6px">カード番号や会員番号は入力しないでください。レシートの写真は端末の外へ送らず、保存もしません。</p>
+  <div class="two">
+    <label class="f">日付<input type="date" id="eDate"></label>
+    <label class="f">お店<input type="text" id="eStore" placeholder="例：スーパー" autocomplete="off" enterkeyhint="next"></label>
+  </div>
+  <div>
+    <div class="seg" id="paySeg" role="group" aria-label="支払い方法"><button type="button" data-pay="cash">現金</button><button type="button" data-pay="code">バーコード決済</button><button type="button" data-pay="credit">クレジット</button></div>
+    <label class="f" id="cardWrap" style="margin-top:8px" hidden>使ったカード<select id="eCard" data-pick="使ったカード"></select></label>
+    <p class="hint" id="cardHint"></p>
+  </div>
+  <div>
+    <div class="rows" id="itemRows"></div>
+    <button class="dashed" id="addRow" type="button" style="margin-top:8px">＋ 品目を追加</button>
+  </div>
+  <button class="danger-b" id="deleteBtn" type="button" hidden>この記録を消す</button>
+  <div class="sheet-foot">
+    <div class="matchbox" id="matchBox" hidden>
+      <p id="matchText"></p>
+      <div class="seg" id="matchSeg" role="group" aria-label="重複の扱い"><button type="button" data-k="same">同じ買い物（重複なし）</button><button type="button" data-k="new">別の買い物</button></div>
+    </div>
+    <div class="total"><span>合計</span><span class="num" id="eTotal"></span></div>
+    <div class="foot-btns"><button class="cancel" data-close="editOverlay" type="button">キャンセル</button><button class="primary" id="saveBtn" type="button">保存する</button></div>
+  </div>
+</div></div>
+
+<!-- 投資の記録 -->
+<div class="overlay" id="invOverlay" hidden><div class="sheet has-foot gutter" id="invSheet" role="dialog" aria-modal="true" aria-labelledby="invTitle">
+  <div class="sheet-head"><h2 id="invTitle" style="text-align:left">投資を記録</h2></div>
+  <div class="two">
+    <label class="f">日付<input type="date" id="iDate"></label>
+    <label class="f">投資した金額（円）<input type="text" id="iAmount" inputmode="numeric" placeholder="例：3000" autocomplete="off"></label>
+  </div>
+  <button class="dashed" id="iSuggest" type="button" hidden></button>
+  <label class="f">メモ（任意）<input type="text" id="iMemo" placeholder="例：全世界株式のファンド" autocomplete="off" enterkeyhint="done"></label>
+  <p class="hint">口座番号やログイン情報は入力しないでください。</p>
+  <button class="danger-b" id="iDelete" type="button" hidden>この記録を消す</button>
+  <div class="sheet-foot"><div class="foot-btns"><button class="cancel" data-close="invOverlay" type="button">キャンセル</button><button class="primary" id="iSave" type="button">保存する</button></div></div>
+</div></div>
+
+<!-- クレジットカードの一覧 -->
+<div class="overlay" id="cardsOverlay" hidden><div class="sheet gutter" role="dialog" aria-modal="true" aria-labelledby="cardsTitle">
+  <div class="sheet-head"><h2 id="cardsTitle" style="text-align:left">クレジットカード</h2></div>
+  <div class="nextpay" id="nextPay" hidden></div>
+  <div id="cardList"></div>
+  <button class="dashed" id="addCardBtn" type="button">＋ カードを追加</button>
+  <p class="hint">カードをタップすると、締め日と引き落とし日を設定できます。カード番号は入力しないでください。名前（例：楽天カード）だけ登録します。</p>
+  <button class="cancel" data-close="cardsOverlay" type="button">閉じる</button>
+</div></div>
+
+<!-- カードの設定 -->
+<div class="overlay" id="cardOverlay" hidden><div class="sheet has-foot gutter" id="cardSheet" role="dialog" aria-modal="true" aria-labelledby="cardTitle">
+  <div class="sheet-head"><h2 id="cardTitle" style="text-align:left">カードの設定</h2></div>
+  <label class="f">カードの名前<input type="text" id="cName" maxlength="30" placeholder="例：楽天カード" autocomplete="off" enterkeyhint="done"></label>
+  <label class="f">締め日<select id="cClose" data-pick="締め日"></select></label>
+  <div class="two"><label class="f">引き落とし月<select id="cMonths" data-pick="引き落とし月"></select></label><label class="f">引き落とし日<select id="cPay" data-pick="引き落とし日"></select></label></div>
+  <p class="hint" id="cRule"></p>
+  <p class="hint">設定していないカードは「月末締め・翌月27日払い」で計算します。カード番号は入力しないでください。</p>
+  <button class="danger-b" id="cDelete" type="button" hidden>このカードを消す</button>
+  <div class="sheet-foot"><div class="foot-btns"><button class="cancel" data-close="cardOverlay" type="button">キャンセル</button><button class="primary" id="cSave" type="button">保存する</button></div></div>
+</div></div>
+
+<!-- メールから自動取り込み -->
+<div class="overlay" id="mailOverlay" hidden><div class="sheet has-foot gutter" id="mailSheet" role="dialog" aria-modal="true" aria-labelledby="mailTitle">
+  <div class="sheet-head"><h2 id="mailTitle" style="text-align:left">メールから自動取り込み</h2></div>
+  <div class="note" id="mailState"></div>
+  <p class="hint">三井住友カードの「ご利用のお知らせ」メールだけを読み、日付・金額・利用先だけを取り込みます。JCBは、メールの見本をいただいてから対応します。</p>
+  <button class="dashed" id="mailGuideBtn" type="button">連携の準備をする（初回だけ）</button>
+  <label class="f">連携のURL<input type="text" id="mailUrl" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+  <label class="f">三井住友カードの記録に使うカード<select id="mCardSmbc" data-pick="記録に使うカード"></select></label>
+  <div><div class="hint" style="margin:0 0 4px">取り込み方</div><div class="seg" id="mailSeg" role="group" aria-label="取り込み方"><button type="button" data-a="1">自動で記録する</button><button type="button" data-a="0">確認してから記録</button></div></div>
+  <p class="hint">すでに同じカード・同じ金額（前後1日以内）の記録があれば、重複として記録しません。取消や、買物以外のご利用は自動では記録しません。</p>
+  <p class="status" id="mailMsg" role="status"></p>
+  <p class="hint" id="mailLast"></p>
+  <div class="sheet-foot"><div class="foot-btns"><button class="cancel" data-close="mailOverlay" type="button">閉じる</button><button class="primary" id="mailRun" type="button">今すぐ取り込む</button></div></div>
+</div></div>
+
+<!-- 連携の準備 -->
+<div class="overlay" id="mailGuideOverlay" hidden><div class="sheet has-foot gutter" id="mailGuideSheet" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+  <div class="sheet-head"><h2 id="guideTitle" style="text-align:left">連携の準備（初回だけ）</h2></div>
+  <p class="hint">あなたのGoogleアカウントの中に、小さなプログラムを置きます。三井住友カードのメールだけを読み、日付・金額・利用先だけをこのアプリに返します。</p>
+  <ol class="steps">
+    <li>下の「スクリプトをコピー」を押します。</li>
+    <li>ブラウザで <b>script.google.com</b> を開き、「新しいプロジェクト」を選びます。最初にある文字をすべて消して、コピーしたものを貼り付け、保存します。</li>
+    <li>右上の「デプロイ」→「新しいデプロイ」を選び、種類は「ウェブアプリ」にします。「次のユーザーとして実行」は<b>自分</b>、「アクセスできるユーザー」は<b>全員</b>にして、「デプロイ」を押します。</li>
+    <li>「アクセスを承認」を押し、Googleの画面で許可します。「このアプリは確認されていません」と出たら、「詳細」→「（プロジェクト名）に移動」を選びます。あなたが今作ったプログラムです。</li>
+    <li>表示された「ウェブアプリ」のURLをコピーし、前の画面の「連携のURL」に貼り付けます。</li>
+    <li>「今すぐ取り込む」で試します。</li>
+  </ol>
+  <button class="primary" id="gasCopy" type="button">スクリプトをコピー</button>
+  <textarea id="gasText" readonly rows="6" aria-label="スクリプト" hidden></textarea>
+  <p class="hint">URLと合言葉を知らない人は、読み取れません。URLは他の人に見せないでください。合言葉はスクリプトの中に入っています。</p>
+  <button class="danger-b" id="tokenNew" type="button">合言葉を作り直す</button>
+  <div class="sheet-foot"><button class="cancel" data-close="mailGuideOverlay" type="button">閉じる</button></div>
+</div></div>
+
+<!-- 取り込む内容の確認 -->
+<div class="overlay" id="mailPrevOverlay" hidden><div class="sheet has-foot gutter" id="mailPrevSheet" role="dialog" aria-modal="true" aria-labelledby="prevTitle">
+  <div class="sheet-head"><h2 id="prevTitle" style="text-align:left">取り込む内容の確認</h2></div>
+  <div id="mailPrevBody"></div>
+  <div class="sheet-foot"><div class="foot-btns"><button class="cancel" data-close="mailPrevOverlay" type="button">キャンセル</button><button class="primary" id="mpOk" type="button">記録する</button></div></div>
+</div></div>
+
+<!-- 年月を選ぶ -->
+<div class="overlay" id="monthOverlay" hidden><div class="sheet gutter" role="dialog" aria-modal="true" aria-labelledby="monthTitle">
+  <div class="sheet-head"><h2 id="monthTitle">年月を選ぶ</h2></div>
+  <div class="two"><label class="f">年<select id="pickY" data-pick="年"></select></label><label class="f">月<select id="pickM" data-pick="月"></select></label></div>
+  <div class="foot-btns"><button class="cancel" data-close="monthOverlay" type="button">キャンセル</button><button class="primary" id="pickOk" type="button">この月を表示</button></div>
+</div></div>
+
+<!-- 選択（プルダウンの代わり） -->
+<div class="overlay" id="selOverlay" hidden><div class="sheet gutter" id="selSheet" role="dialog" aria-modal="true" aria-labelledby="selTitle">
+  <div class="sheet-head"><h2 id="selTitle" style="text-align:left"></h2></div>
+  <div class="optlist" id="selList" role="listbox"></div>
+  <button class="cancel" data-close="selOverlay" type="button">キャンセル</button>
+</div></div>
+
+<div class="toast" id="toastEl" role="status" hidden></div>
+
+<script src="js/core/util.js"></script>
+<script src="js/core/guard.js"></script>
+<script src="js/core/storage.js"></script>
+<script src="js/core/billing.js"></script>
+<script src="js/core/gas-source.js"></script>
+<script src="js/features/calendar.js"></script>
+<script src="js/features/day.js"></script>
+<script src="js/features/edit.js"></script>
+<script src="js/features/receipt.js"></script>
+<script src="js/features/invest.js"></script>
+<script src="js/features/summary.js"></script>
+<script src="js/features/settings.js"></script>
+<script src="js/features/mail.js"></script>
+<script src="js/ui/picker.js"></script>
+<script src="js/ui/sheet-swipe.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
