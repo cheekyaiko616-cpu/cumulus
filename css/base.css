@@ -40,11 +40,14 @@ button { cursor: pointer; }
 .col { max-width: 520px; margin: 0 auto; }
 
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--band); }
-header { flex-shrink: 0; z-index: 5; background: var(--band); color: #fff; padding-block: 8px; }
-header .col { display: flex; align-items: center; gap: 8px; min-height: 40px; }
-.hbtn { width: 40px; height: 40px; border: 0; border-radius: 12px; background: rgba(255,255,255,.16); color: #fff; font-size: 24px; line-height: 1; font-weight: 700; flex-shrink: 0; }
+header { flex-shrink: 0; z-index: 5; background: var(--band); color: #fff; padding-block: 6px 8px; }
+header .col { display: flex; flex-direction: column; gap: 2px; }
+/* 上の段：アプリ名（すべての画面で表示） */
+.brand { font: 700 11px/1.2 var(--num); letter-spacing: .18em; opacity: .82; }
+/* 下の段：画面ごとの操作 */
+.hrow { display: flex; align-items: center; gap: 8px; min-height: 38px; }
+.hbtn { width: 40px; height: 38px; border: 0; border-radius: 12px; background: rgba(255,255,255,.16); color: #fff; font-size: 24px; line-height: 1; font-weight: 700; flex-shrink: 0; }
 .sp { margin-left: auto; }
-.brand { font-size: 12px; letter-spacing: .16em; opacity: .85; margin-right: auto; }
 .pill .caret { font-size: 11px; margin-left: 6px; }
 .pill { background: #fff; color: #174f42; border: 0; border-radius: 12px; padding: 5px 12px; font-weight: 700; font-size: 16px; }
 .ghost { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.8); border-radius: 12px; padding: 3px 12px; font-weight: 700; font-size: 14px; }
@@ -63,7 +66,7 @@ main.fit #view-calendar { flex: 1 1 auto; min-height: 0; }
 .sample button { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 3px 10px; font-size: 12px; font-weight: 700; }
 /* 幅の狭い画面（〜350px）でも、ヘッダーを1行に収める */
 @media (max-width: 350px) {
-  header .col { gap: 6px; flex-wrap: nowrap; }
+  .hrow { gap: 6px; flex-wrap: nowrap; }
   .hbtn { width: 34px; height: 36px; font-size: 22px; }
   .pill { padding: 4px 9px; font-size: 15px; white-space: nowrap; }
   .pill .caret { margin-left: 4px; }
