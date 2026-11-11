@@ -10,13 +10,13 @@ fillOptions("cClose", dayOptions); fillOptions("cPay", dayOptions); fillOptions(
 
 // 設定画面の項目の枚数・一覧・次の引き落としを描く
 function renderCards() {
-  $("cardsSummary").textContent = state.cards.length ? state.cards.length + "枚" : "未登録";
+  $("cardsSummary").textContent = state.cards.length ? state.cards.length + "枚" : "なし";
   renderCardList(); renderNextPay();
 }
 function renderCardList() {
   $("cardList").innerHTML = state.cards.length
     ? state.cards.map((c, i) => '<button type="button" class="item" data-cardi="' + i + '"><span class="l">' + esc(c.name) + "<small>" + cardRuleText(c) + '</small></span><span class="r" aria-hidden="true">›</span></button>').join("")
-    : emptyHtml("まだカードがありません。下の「カードを追加」から登録できます。");
+    : emptyHtml("カードがありません");
 }
 // 次の引き落とし（今日以降の3件まで）
 function renderNextPay() {

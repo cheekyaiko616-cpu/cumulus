@@ -31,10 +31,8 @@ function renderCalendar() {
   const st = rangeStats(ymd(viewYear, viewMonth, 1), ymd(viewYear, viewMonth, days));
   $("mSpent").textContent = yen(st.spent);
   $("mSpentLab").textContent = (viewMonth + 1) + "月 使った金額";
-  $("mSpentSub").textContent = st.count + "件の買い物";
   $("mInvestLab").textContent = (viewMonth + 1) + "月の投資資金";
   $("mInvest").textContent = yen(st.invest);
-  $("mInvestSub").textContent = "使わなかった日 " + st.savedDays + "日";
 }
 function moveMonth(delta) {
   const d = new Date(viewYear, viewMonth + delta, 1); viewYear = d.getFullYear(); viewMonth = d.getMonth(); renderCalendar();

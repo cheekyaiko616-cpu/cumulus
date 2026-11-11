@@ -1,15 +1,17 @@
 "use strict";
 // ===== 設定画面 =====
-// 役割: 投資資金のルール（1日あたりの金額・数え始める日）と、データを消す操作、見本を消す操作（カードは cards.js、メールは mail.js）
+// 役割: 設定画面（項目の一覧：一般・カード・メール連携・データ）。投資資金のルール（1日あたりの金額・数え始める日）の入力画面と、データを消す操作、見本を消す操作（カードは cards.js、メールは mail.js）
 // 依存: util.js, model.js, storage.js, dom.js, overlay.js
 // 実行時: なし
 // 公開: renderSettings
 
 function renderSettings() {
+  $("ruleSummary").textContent = yen(state.daily) + "／日";
   if (document.activeElement !== $("setDaily")) $("setDaily").value = state.daily;
   $("setStart").value = state.start;
   $("setStart").max = todayStr();
 }
+$("openRule").onclick = () => { renderSettings(); openOv("ruleOverlay"); };
 $("setDaily").onchange = () => { state.daily = Math.min(MAX_DAILY, Math.max(0, toInt($("setDaily").value))); save(); toast("1日 " + yen(state.daily) + " にしました"); };
 $("setStart").onchange = () => {
   let v = $("setStart").value;

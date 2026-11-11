@@ -29,12 +29,12 @@ async function fetchMail() {
   } finally { clearTimeout(timer); }
 }
 const mailErrText = (e) => ({
-  setup: "まだ連携の準備ができていません。「連携の準備をする」から進めてください。",
-  token: "合言葉が合いません。「連携の準備をする」でスクリプトをコピーし直し、貼り付け直してください。",
+  setup: "まだ連携していません。「連携の準備」から進めてください。",
+  token: "合言葉が合いません。「連携の準備」でスクリプトをコピーし直して貼り替えてください。",
   timeout: "時間がかかったので止めました。もう一度試してください。",
   format: "想定と違う返事でした。URLが「…/exec」で終わっているか確認してください。",
   http: "取得できませんでした。URLが正しいか、デプロイの「アクセスできるユーザー」が「全員」か確認してください。",
-}[e && e.message] || "接続できませんでした。通信状況とURLを確認してください。（このプレビュー画面からは接続できません。公開したアプリで使えます）");
+}[e && e.message] || "接続できませんでした。通信状況とURLを確認してください。");
 function mailMsg(t) { $("mailMsg").textContent = t || ""; }
 
 // ---- 実行 ----
@@ -81,7 +81,7 @@ const pvRow = (it) => debRow(mdLabel(it.date) + " " + esc(safeStore(it.store) ||
 function showPreview(plan, u) {
   const sec = (title, list) => list.length ? '<div class="subhead">' + title + "（" + list.length + "件）</div>" + list.map(pvRow).join("") : "";
   $("mailPrevBody").innerHTML = (plan.add.length ? "" : emptyHtml("新しく記録するものはありません")) +
-    sec("記録する", plan.add) + sec("重複のため記録しない", plan.dup) + sec("要確認（取消・買物以外のため自動では記録しません）", plan.other) +
+    sec("記録する", plan.add) + sec("重複のため記録しない", plan.dup) + sec("要確認（自動では記録しません）", plan.other) +
     '<p class="hint">' + planNote(plan, u, mailInfo) + "</p>";
   $("mpOk").hidden = !plan.add.length; $("mpOk").textContent = plan.add.length + "件を記録する";
   openOv("mailPrevOverlay");
@@ -95,14 +95,14 @@ $("mpOk").onclick = () => {
 const mailPickId = (k) => "mCard" + k[0].toUpperCase() + k.slice(1);
 function renderMail() {
   const m = state.mail, ready = mailReady();
-  $("mailSummary").textContent = !ready ? "未設定" : mailPending ? "新着" + mailPending + "件" : m.auto ? "自動で記録" : "確認して記録";
-  $("mailState").textContent = ready ? "連携できています。" + (m.auto ? "アプリを開くと、新しい利用明細を自動で記録します。" : "アプリを開くと新着を調べ、確認してから記録します。") : "まだ連携していません。下の「連携の準備をする」から始めてください。";
+  $("mailSummary").textContent = !ready ? "未連携" : mailPending ? "新着" + mailPending + "件" : m.auto ? "自動で記録" : "確認して記録";
+  $("mailState").textContent = ready ? "連携済み・" + (m.auto ? "自動で記録" : "確認してから記録") : "未連携です。まず「連携の準備」から。";
   if (document.activeElement !== $("mailUrl")) $("mailUrl").value = m.url;
   setSeg($("mailSeg"), (b) => (b.dataset.a === "1") === m.auto);
   const names = state.cards.map((c) => c.name);
   Object.keys(MAIL_ISSUERS).forEach((k) => {                       // 発行元ごとの記録先カードの選択欄（id は mCard + 先頭大文字：mCardSmbc, mCardJcb）
     const sel = $(mailPickId(k));
-    sel.innerHTML = '<option value="">自動（名前に「' + MAIL_ISSUERS[k].hint + '」を含むカード）</option>' + names.map((n) => "<option" + (n === m.cards[k] ? " selected" : "") + ">" + esc(n) + "</option>").join("");
+    sel.innerHTML = '<option value="">自動（名前に「' + MAIL_ISSUERS[k].hint + '」を含む）</option>' + names.map((n) => "<option" + (n === m.cards[k] ? " selected" : "") + ">" + esc(n) + "</option>").join("");
     if (!names.includes(m.cards[k])) sel.value = "";
   });
   $("mailLast").textContent = m.last ? "前回：" + new Date(m.last).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) + (m.lastNote ? "（" + m.lastNote + "）" : "") : "";
@@ -114,8 +114,8 @@ $("mailSeg").onclick = (e) => { const b = e.target.closest("[data-a]"); if (b) {
 Object.keys(MAIL_ISSUERS).forEach((k) => { $(mailPickId(k)).onchange = () => { state.mail.cards[k] = $(mailPickId(k)).value; save(); }; });
 $("mailUrl").onchange = () => {
   const v = $("mailUrl").value.trim();
-  if (v && !MAIL_URL_RE.test(v)) { mailMsg("URLは「https://script.google.com/…/exec」の形です。コピーし直してください。"); $("mailUrl").value = state.mail.url; return; }
-  state.mail.url = v; state.mail.last = 0; mailBlocked = false; save(); mailMsg(v ? "URLを保存しました。「今すぐ取り込む」で試せます。" : "");
+  if (v && !MAIL_URL_RE.test(v)) { mailMsg("URLは「https://script.google.com/…/exec」の形です。"); $("mailUrl").value = state.mail.url; return; }
+  state.mail.url = v; state.mail.last = 0; mailBlocked = false; save(); mailMsg(v ? "URLを保存しました" : "");
 };
 
 // ---- 連携の準備（初回だけ） ----

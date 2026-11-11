@@ -94,9 +94,8 @@ function renderInvest() {
   $("invLabel").textContent = r.label;
   $("invSpan").textContent = ymdLabel(r.from) + " 〜 " + ymdLabel(r.to) + "（" + span + "日間）";
   $("invHero").textContent = yen(st.invest);
-  $("invDone").textContent = yen(st.invested) + "（" + st.investCount + "件）";
+  $("invDone").textContent = yen(st.invested);
   $("invLeft").textContent = yenS(st.left);
-  $("invSub").textContent = "使わなかった日 " + st.savedDays + "日 × " + yen(state.daily);
   const list = state.invests.filter((v) => v.date >= r.from && v.date <= r.to).sort((a, b) => a.date < b.date ? 1 : -1);
   $("invList").innerHTML = list.length ? list.map(invItemHtml).join("") : emptyHtml("この期間の投資の記録はありません");
   renderMonthList();

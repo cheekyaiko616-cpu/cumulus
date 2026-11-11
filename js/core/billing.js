@@ -34,8 +34,8 @@ function buildPayments() {
   state.entries.forEach((e) => {
     if (e.pay !== "credit") return;
     const name = e.card || "カード未選択", c = cardOf(e.card), end = cycleEnd(e.date, c.close), date = payDateOf(end, c), k = date + "|" + name;
-    const g = groups[k] || (groups[k] = { date, card: name, amount: 0, count: 0, from: cycleStart(end, c.close), to: end });
-    g.amount += e.total; g.count++;
+    const g = groups[k] || (groups[k] = { date, card: name, amount: 0, from: cycleStart(end, c.close), to: end });
+    g.amount += e.total;
   });
   pays = Object.values(groups).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.card < b.card ? -1 : 1);
   paysByDate = {};

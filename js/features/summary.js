@@ -17,12 +17,10 @@ function renderSummary() {
   $("navRow").hidden = period === "custom"; $("customBox").hidden = period !== "custom";
   if (period === "custom") { $("cFrom").value = customFrom; $("cTo").value = customTo; }
   const r = periodRange(), st = rangeStats(r.from, r.to), span = daysBetween(r.from, r.to) + 1;
-  const elapsed = Math.max(0, Math.min(span, daysBetween(r.from, todayStr()) + 1));      // 今日までの日数（1日平均の割り算に使う）
   $("periodLabel").textContent = r.label;
   $("periodSpan").textContent = ymdLabel(r.from) + " 〜 " + ymdLabel(r.to) + "（" + span + "日間）";
   $("pSpent").textContent = yen(st.spent);
-  $("pSpentSub").textContent = st.count + "件" + (elapsed ? " ・1日平均 " + yen(st.spent / elapsed) : "");
-  $("pInvest").textContent = yen(st.invest); $("pInvestSub").textContent = "使わなかった日 " + st.savedDays + "日";
+  $("pInvest").textContent = yen(st.invest);
   const list = state.entries.filter((e) => e.date >= r.from && e.date <= r.to).sort((a, b) => a.date < b.date ? 1 : -1);
   const groups = {};
   list.forEach((e) => { const k = payLabel(e); (groups[k] = groups[k] || { sum: 0, color: payColor(e) }).sum += e.total; });

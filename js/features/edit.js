@@ -26,7 +26,7 @@ function updateCardHint() {
   const h = $("cardHint"), date = $("eDate").value, name = $("eCard").value;
   if (editPay !== "credit" || !isKey(date) || !name) { h.textContent = ""; return; }
   const c = cardOf(name);
-  h.textContent = "この買い物は " + mdLabel(payDateOf(cycleEnd(date, c.close), c)) + " に引き落とされます（" + cardRuleText(c) + "）";
+  h.textContent = mdLabel(payDateOf(cycleEnd(date, c.close), c)) + " に引き落とされます（" + cardRuleText(c) + "）";
 }
 $("eCard").onchange = () => { updateCardHint(); updateMatch(); };
 $("eDate").onchange = () => { updateCardHint(); updateMatch(); };
@@ -41,7 +41,7 @@ function updateMatch() {
   const hit = findMailMatch(), box = $("matchBox");
   box.hidden = !hit;
   if (!hit) return;
-  $("matchText").textContent = "メールで取り込み済み：" + mdLabel(hit.date) + " " + (hit.store || "ご利用") + " " + yen(hit.total) + "。同じ買い物なら、この記録に反映します。";
+  $("matchText").textContent = "メール取込済み：" + mdLabel(hit.date) + " " + (hit.store || "ご利用") + " " + yen(hit.total);
   setSeg($("matchSeg"), (b) => (b.dataset.k === "same") === (matchMode === "same"));
 }
 $("matchSeg").onclick = (e) => { const b = e.target.closest("[data-k]"); if (b) { matchMode = b.dataset.k; updateMatch(); } };
@@ -59,6 +59,7 @@ function openEdit(entry, date) {
   $("itemRows").innerHTML = entry ? entry.items.map((i) => rowHtml(i.n, i.p)).join("") : rowHtml("", "");
   $("deleteBtn").hidden = !entry; $("deleteBtn").textContent = "この記録を消す"; delete $("deleteBtn").dataset.armed;
   $("ocrStatus").textContent = "";
+  $("ocrPick").hidden = true; $("ocrPick").innerHTML = "";
   updateTotal();
   openOv("editOverlay");
   $("editSheet").scrollTop = 0;
