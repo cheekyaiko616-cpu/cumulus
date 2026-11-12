@@ -1,9 +1,9 @@
 "use strict";
 // ===== レシートの写真を読みやすくする計算 =====
-// 役割: 写真の向き（EXIF）・縮小の大きさ・白黒化（影に強い局所しきい値）の計算。画素の配列だけを扱う（canvas・写真の読み込みは features/receipt.js）
+// 役割: 写真の向き（EXIF）・縮小の大きさ・白黒化（影に強い局所しきい値）・文字の高さ・紙の範囲の計算。画素の配列だけを扱う（canvas・写真の読み込みは features/receipt.js）
 // 依存: なし
 // 実行時: なし
-// 公開: exifOrientation, jpegSize, orientMatrix, fitSize, toGray, binarize, despeckle
+// 公開: exifOrientation, jpegSize, orientMatrix, fitSize, toGray, binarize, despeckle, textHeight, paperBox
 
 // JPEGの先頭部分（バイト列）から、EXIFの向き（1〜8）を読む。なければ1（そのまま）
 function exifOrientation(u) {
@@ -97,8 +97,8 @@ function binarize(gray, w, h, opt) {
   }
   return gray;
 }
-// 白黒にした画像から、文字ではない黒を消す：小さすぎる点（机の模様・ノイズ）と、大きすぎるかたまり（紙の縁に沿った黒い縁取り・罫線）。黒い連結部分を行ごとの連なりで数えるので、メモリは少ない
-function despeckle(g, w, h, minArea, maxDim) {
+// 白黒の画像の黒いかたまり（つながった黒い画素）を、行ごとの黒の連なりから数える（メモリが少ない）。かたまりごとの面積・外枠と、連なりがどのかたまりかを返す
+function blobs(g, w, h) {
   let cap = 1 << 15, rs = new Int32Array(cap), re = new Int32Array(cap), n = 0;
   const rowAt = new Int32Array(h + 1);
   for (let y = 0; y < h; y++) {
@@ -123,12 +123,72 @@ function despeckle(g, w, h, minArea, maxDim) {
   }
   const area = new Int32Array(n), x0 = new Int32Array(n).fill(1 << 30), x1 = new Int32Array(n), y0 = new Int32Array(n).fill(1 << 30), y1 = new Int32Array(n);
   for (let y = 0; y < h; y++) for (let i = rowAt[y]; i < rowAt[y + 1]; i++) {
-    const r = find(i); area[r] += re[i] - rs[i] + 1;
+    const r = find(i); par[i] = r; area[r] += re[i] - rs[i] + 1;
     if (rs[i] < x0[r]) x0[r] = rs[i]; if (re[i] > x1[r]) x1[r] = re[i]; if (y < y0[r]) y0[r] = y; if (y > y1[r]) y1[r] = y;
   }
-  for (let y = 0; y < h; y++) for (let i = rowAt[y]; i < rowAt[y + 1]; i++) {
-    const r = find(i);
-    if (area[r] < minArea || x1[r] - x0[r] + 1 > maxDim || y1[r] - y0[r] + 1 > maxDim) g.fill(255, y * w + rs[i], y * w + re[i] + 1);
+  return { n, rs, re, rowAt, root: par, area, x0, x1, y0, y1 };
+}
+// 白黒にした画像から、文字ではない黒を消す：小さすぎる点（机の模様・ノイズ）と、大きすぎるかたまり（紙の縁に沿った黒い縁取り・罫線）
+function despeckle(g, w, h, minArea, maxDim) {
+  const b = blobs(g, w, h);
+  for (let y = 0; y < h; y++) for (let i = b.rowAt[y]; i < b.rowAt[y + 1]; i++) {
+    const r = b.root[i];
+    if (b.area[r] < minArea || b.x1[r] - b.x0[r] + 1 > maxDim || b.y1[r] - b.y0[r] + 1 > maxDim) g.fill(255, y * w + b.rs[i], y * w + b.re[i] + 1);
   }
   return g;
+}
+// 白黒にした画像の、文字の高さ（画素）の目安：文字くらいの形のかたまりの高さの中央値。かたまりが少なすぎるときは 0
+function textHeight(g, w, h) {
+  const b = blobs(g, w, h), hs = [];
+  for (let i = 0; i < b.n; i++) {
+    if (b.root[i] !== i) continue;
+    const bh = b.y1[i] - b.y0[i] + 1, bw = b.x1[i] - b.x0[i] + 1;
+    if (bh >= 6 && bh < h / 8 && bw < bh * 3 && b.area[i] > 10) hs.push(bh);
+  }
+  if (hs.length < 20) return 0;
+  hs.sort((a, c) => a - c);
+  return hs[hs.length >> 1];
+}
+// 暗い机・布の上で撮ったレシートの、紙（明るい所）の範囲を探す。gray は縮めた画像（長辺200〜400画素ほど）の明るさ。
+// 明るさの2つの山の間（大津の方法）で紙と背景に分け、いちばん大きな明るいかたまりの外枠を少し広げて返す。
+// 切り出すのは、背景がとても暗い（黒い布など）か、紙が写真の縁から離れて置かれているときだけ（影で暗くなった紙を背景と間違えて切らない）。それ以外・見分けられないときは null（そのまま使う）
+function paperBox(gray, w, h) {
+  const n = w * h, hist = new Float64Array(256);
+  for (let i = 0; i < n; i++) hist[gray[i]]++;
+  let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+  let wb = 0, sb = 0, best = -1, th = 128;
+  for (let t = 0; t < 256; t++) {
+    wb += hist[t]; if (!wb || wb === n) continue;
+    sb += t * hist[t];
+    const mb = sb / wb, mf = (sum - sb) / (n - wb), v = wb * (n - wb) * (mb - mf) * (mb - mf);
+    if (v > best) { best = v; th = t; }
+  }
+  let dark = 0, light = 0, cd = 0, cl = 0;
+  for (let i = 0; i < n; i++) if (gray[i] > th) { light += gray[i]; cl++; } else { dark += gray[i]; cd++; }
+  if (!cd || !cl) return null;
+  dark /= cd; light /= cl;
+  if (light < 120 || light - dark < 60) return null;                                                 // 紙と背景の明るさの差が小さい
+  const t2 = dark + 0.3 * (light - dark);                                                            // 影で少し暗い紙も紙に含める
+  const lab = new Uint8Array(n), stack = new Int32Array(n);
+  let bestN = 0, bx = null;
+  for (let s = 0; s < n; s++) {
+    if (gray[s] <= t2 || lab[s]) continue;
+    let sp = 0, cnt = 0, x0 = w, x1 = 0, y0 = h, y1 = 0; stack[sp++] = s; lab[s] = 1;
+    while (sp) {
+      const p = stack[--sp], x = p % w, y = (p - x) / w; cnt++;
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      if (x > 0 && !lab[p - 1] && gray[p - 1] > t2) { lab[p - 1] = 1; stack[sp++] = p - 1; }
+      if (x < w - 1 && !lab[p + 1] && gray[p + 1] > t2) { lab[p + 1] = 1; stack[sp++] = p + 1; }
+      if (y > 0 && !lab[p - w] && gray[p - w] > t2) { lab[p - w] = 1; stack[sp++] = p - w; }
+      if (y < h - 1 && !lab[p + w] && gray[p + w] > t2) { lab[p + w] = 1; stack[sp++] = p + w; }
+    }
+    if (cnt > bestN) { bestN = cnt; bx = [x0, y0, x1, y1]; }
+  }
+  if (!bx || bestN < n * 0.03) return null;                                                          // 紙が小さすぎる（見つけ違い）
+  const edge = bx[0] <= 1 || bx[1] <= 1 || bx[2] >= w - 2 || bx[3] >= h - 2;
+  if (edge && dark > light * 0.35) return null;                                                      // 背景がそれほど暗くなく、紙が縁にかかる：影の境目かもしれない
+  const mx = Math.round(0.02 * w), my = Math.round(0.02 * h);
+  const x0 = Math.max(0, bx[0] - mx), y0 = Math.max(0, bx[1] - my), x1 = Math.min(w, bx[2] + 1 + mx), y1 = Math.min(h, bx[3] + 1 + my);
+  if ((x1 - x0) * (y1 - y0) > n * 0.85) return null;                                                 // ほとんど全部が紙：切り出す意味がない
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }

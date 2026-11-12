@@ -1,12 +1,13 @@
 "use strict";
 // ===== レシートの写真の読み取り =====
-// 役割: 写真を開き（向きを直し）、文字に読み取り（読めなかったときは影に強い白黒にしてもう一度）、入力画面の品目・お店・日付に入れる。合計と日付に候補があるときは選べるようにする。写真は保存せず、外にも送らず、終わったらすぐ捨てる（文字の解析は core/receipt-parse.js、画素の計算は core/receipt-image.js）
-// 依存: util.js, receipt-parse.js, receipt-image.js, dom.js
+// 役割: 写真を開き（向きを直し）、暗い背景の上なら紙の所だけにして、影に強い白黒で文字に読み取り（足りなければ写真のままでもう一度）、入力画面の品目・お店・日付・支払い方法に入れる。合計と日付に候補があるときは選べるようにする。写真は保存せず、外にも送らず、終わったらすぐ捨てる（文字の解析は core/receipt-parse.js、画素の計算は core/receipt-image.js）
+// 依存: util.js, model.js, receipt-parse.js, receipt-image.js, dom.js
 // 実行時: edit.js
 // 公開: なし
 
 const OCR_JS = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
 const OCR_SIZES = [[3000, 7e6], [1800, 3.2e6]];                       // [長辺, 画素数の上限]。大きい方で失敗したら小さい方でやり直す（iPhoneのメモリ対策）
+const OCR_TEXT_MAX = 48, OCR_TEXT_FIT = 40;                            // 文字の高さがこれより大きいときは、この高さになるよう縮める（画素）
 const OCR_MSG = {
   open: "この写真は開けませんでした。別の写真で試すか、手で入力してください。",
   data: "読み取り用のデータを取得できませんでした。通信を確かめて、もう一度お試しください。",
@@ -73,24 +74,36 @@ async function openPhoto(file) {
   const fix = ori >= 5 && raw && raw.w !== raw.h && sw === raw.w && sh === raw.h ? ori : 1;      // 向きが5〜8なのに縦横が保存のままなら、補正されていない
   return { src, sw, sh, ori: fix, close() { if (src.close) src.close(); } };
 }
-// 写真を、長辺 side・画素数 pix に収まる大きさの canvas に描く（向きの補正つき）
-function drawPhoto(ph, side, pix) {
-  const o = orientMatrix(ph.ori, ph.sw, ph.sh), sz = fitSize(o.w, o.h, side, pix), k = sz.w / o.w;
+// 写真の範囲 box（向きを直した後の座標。なければ全体）を、長辺 side・画素数 pix に収まる大きさ（k 倍まで）の canvas に描く
+function drawPhoto(ph, side, pix, box, k0) {
+  const o = orientMatrix(ph.ori, ph.sw, ph.sh), b = box || { x: 0, y: 0, w: o.w, h: o.h };
+  const sz = fitSize(b.w * (k0 || 1), b.h * (k0 || 1), side, pix), k = sz.w / b.w;
   const c = document.createElement("canvas"); c.width = sz.w; c.height = sz.h;
   const g = c.getContext("2d"); if (!g) throw ocrErr("open");
   g.imageSmoothingQuality = "high"; g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
-  g.setTransform(o.m[0] * k, o.m[1] * k, o.m[2] * k, o.m[3] * k, o.m[4] * k, o.m[5] * k); g.drawImage(ph.src, 0, 0);
+  g.setTransform(o.m[0] * k, o.m[1] * k, o.m[2] * k, o.m[3] * k, (o.m[4] - b.x) * k, (o.m[5] - b.y) * k); g.drawImage(ph.src, 0, 0);
   return c;
 }
-// 写真を読み取り用の大きさの canvas にする。メモリが足りなくて失敗したら、小さい大きさでやり直す
-function prepare(ph) {
+// 暗い机・布の上で撮ったときの、紙の範囲（向きを直した後の座標）。小さく縮めた写真で調べる。見つからなければ null（写真全体を使う）
+function findPaper(ph) {
+  try {
+    const c = drawPhoto(ph, 320, 1e9), w = c.width, h = c.height, o = orientMatrix(ph.ori, ph.sw, ph.sh);
+    const b = paperBox(toGray(c.getContext("2d").getImageData(0, 0, w, h).data, w * h), w, h);
+    c.width = c.height = 0;
+    if (!b) return null;
+    const kx = o.w / w, ky = o.h / h, x = Math.floor(b.x * kx), y = Math.floor(b.y * ky);
+    return { x, y, w: Math.min(o.w - x, Math.ceil(b.w * kx)), h: Math.min(o.h - y, Math.ceil(b.h * ky)) };
+  } catch (e) { return null; }
+}
+// 写真を読み取り用の大きさの canvas にする（紙の範囲だけ）。メモリが足りなくて失敗したら、小さい大きさでやり直す。k は縮める倍率（文字が大きすぎるとき）
+function prepare(ph, box, k) {
   let last = null;
   for (const [side, pix] of OCR_SIZES) {
-    try { return drawPhoto(ph, side, pix); } catch (e) { last = e; }
+    try { return drawPhoto(ph, side, pix, box, k); } catch (e) { last = e; }
   }
   throw last && last.ocr ? last : ocrErr("open");
 }
-// 影に強い白黒の canvas を作る（1回目で読めなかったときだけ使う）。真っ白・真っ黒になったときは null（読めるはずの写真を潰さない）
+// 影に強い白黒の canvas と、文字の高さ（画素）を作る。真っ白・真っ黒になったときは canvas を null にする（読めるはずの写真を潰さない）
 function binaryCanvas(c) {
   const w = c.width, h = c.height, g = c.getContext("2d");
   let gray = toGray(g.getImageData(0, 0, w, h).data, w * h);
@@ -98,15 +111,26 @@ function binaryCanvas(c) {
   despeckle(gray, w, h, 6, Math.round(0.05 * Math.max(w, h)));
   let black = 0; for (let i = 0; i < gray.length; i += 7) if (gray[i] === 0) black++;
   const ratio = black / Math.ceil(gray.length / 7);
-  if (ratio < 0.002 || ratio > 0.45) return null;
+  if (ratio < 0.002 || ratio > 0.45) return { canvas: null, th: 0 };
+  const th = textHeight(gray, w, h);
   const c2 = document.createElement("canvas"); c2.width = w; c2.height = h;
   const id = c2.getContext("2d").createImageData(w, h), d = id.data;
   for (let i = 0, j = 0; i < gray.length; i++, j += 4) { d[j] = d[j + 1] = d[j + 2] = gray[i]; d[j + 3] = 255; }
   c2.getContext("2d").putImageData(id, 0, 0);
   gray = null;
-  return c2;
+  return { canvas: c2, th };
 }
-const rcGood = (r) => !!(r.total && r.date && r.items.length && r.store);
+// 向きを変えた canvas（deg は時計回り 90・180・270。EXIFのない横向き・上下逆の写真用）
+function turned(c, deg) {
+  const w = c.width, h = c.height, o = document.createElement("canvas");
+  o.width = deg === 180 ? w : h; o.height = deg === 180 ? h : w;
+  const g = o.getContext("2d"); if (!g) throw ocrErr("open");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, o.width, o.height);
+  const m = deg === 90 ? [0, 1, -1, 0, h, 0] : deg === 180 ? [-1, 0, 0, -1, w, h] : [0, -1, 1, 0, 0, w];
+  g.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]); g.drawImage(c, 0, 0);
+  return o;
+}
+const rcGood = (r) => !!(r.total && r.date && !r.guess && r.items.length && r.store && r.total === r.items.reduce((a, i) => a + i.p, 0));
 
 // ---- 合計・日付の候補（複数あるときだけ出す。選ぶと入力欄に入る） ----
 function clearPick() { adjRow = null; $("ocrPick").hidden = true; $("ocrPick").innerHTML = ""; }
@@ -146,28 +170,53 @@ $("receiptFile").onchange = async (e) => {
   try {
     ph = await openPhoto(file);
     file = null;
-    c1 = prepare(ph); ph.close(); ph = null;
+    const box = findPaper(ph);                                        // 暗い背景の上のレシートは、紙の所だけにする（文字が大きく写る）
+    c1 = prepare(ph, box);
+    let b = binaryCanvas(c1);
+    if (b.th > OCR_TEXT_MAX) {                                        // 文字が大きすぎる（読み取りが崩れやすく、時間もかかる）：縮めて作り直す
+      const k = (OCR_TEXT_FIT / b.th) * c1.width / (box ? box.w : orientMatrix(ph.ori, ph.sw, ph.sh).w);   // 元の写真に対する倍率
+      if (b.canvas) b.canvas.width = b.canvas.height = 0;
+      c1.width = c1.height = 0; c1 = prepare(ph, box, k);
+      b = binaryCanvas(c1);
+    }
+    c2 = b.canvas; b = null;
+    ph.close(); ph = null;
     await loadOcr();
     worker = await makeWorker(say);
     await worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });        // 6＝ひとかたまりの文字として読む（金額が品名と同じ行に残る）
     const run = async (canvas, ms) => parseReceipt((await within(worker.recognize(canvas), ms, "timeout")).data.text);
     say("読み取り中…");
-    let r = await run(c1, 100000);
+    const [p1, p2] = c2 ? [c2, c1] : [c1, null];                      // 先に影に強い白黒で読む（白黒にできなかったときは写真のまま）
+    let r = await run(p1, 100000);
     if ($("editOverlay").hidden) return;                              // 読み取り中に入力画面を閉じたときは何も書き込まない
-    if (!rcGood(r)) {                                                 // 店名・日付・合計・品目のどれかが読めなかったときだけ、影に強い白黒にしてもう一度読み、よいほうを使う
-      c2 = binaryCanvas(c1);
-      if (c2) { say("もう一度読み取っています…"); r = mergeReceipts(r, await run(c2, 80000)); }
+    if (!rcGood(r) && p2) {                                           // 店名・日付・合計・品目のどれかが読めなかったか、品目の合計が合わないときだけ、写真のままでもう一度読み、よいほうを使う
+      say("もう一度読み取っています…"); r = mergeReceipts(r, await run(p2, 80000));
     }
     if ($("editOverlay").hidden) return;
+    if (!r.total && !r.date) {                                        // 合計も日付も読めない：向きが違う写真（EXIFのない横向き・上下逆）かもしれない。90・180・270度回して読み、いちばんよいものを使う（同点なら元のまま）
+      for (const deg of [90, 180, 270]) {
+        say("向きを変えて読み取っています…");
+        let t = null;
+        try { t = turned(p1, deg); const r2 = await run(t, 60000); if (rcScore(r2) > rcScore(r)) r = r2; } catch (e) { break; } finally { if (t) t.width = t.height = 0; }
+        if ($("editOverlay").hidden) return;
+        if (r.total && r.date) break;
+      }
+    }
     if (!r.items.length && !r.total && !r.date && !r.store) { say(OCR_MSG.blank); return; }
     const cur = readRows();                                           // 入力済みの品目は消さず、後ろに足す
     if (r.items.length) $("itemRows").innerHTML = cur.concat(r.items).map((i) => rowHtml(i.n, i.p)).join("");
     if (r.store && !$("eStore").value.trim()) $("eStore").value = r.store;
     if (r.date) { $("eDate").value = r.date; $("eDate").dispatchEvent(new Event("change")); }
+    if (r.pay) {                                                      // 支払い方法（クレジットなら、カードの会社名が登録済みのカードの名前と合えば、そのカード）
+      setPay(r.pay);
+      const card = r.pay === "credit" && (receiptCard(r.brand, state.cards.map((c) => c.name)) || (r.brand === "JCB" && state.mail.cards.jcb) || "");
+      if (card && state.cards.some((c) => c.name === card)) { $("eCard").value = card; updateCardHint(); }
+    }
     updateTotal();
     const sum = readRows().reduce((a, i) => a + i.p, 0);
     showPick(r, sum);
     say(!r.items.length ? OCR_MSG.noitem : r.items.length + "品目を読み取りました。" + (r.total && r.total !== sum ? "レシートの合計（" + yen(r.total) + "）と合いません。確かめてください。" : ""));
+    $("editSheet").scrollTop = 0;                                     // 結果の案内・合計の候補が見えるよう、入力画面を先頭に戻す（読み取り中に動かしていても）
   } catch (err) {
     say(OCR_MSG[err && err.ocr] || OCR_MSG.engine);
   } finally {
