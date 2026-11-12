@@ -1,7 +1,7 @@
 "use strict";
 // ===== レシートの写真の読み取り =====
 // 役割: 写真を開き（向きを直し）、暗い背景の上なら紙の所だけにして、影に強い白黒で文字に読み取り（足りなければ写真のままでもう一度）、入力画面の品目・お店・日付・支払い方法に入れる。合計と日付に候補があるときは選べるようにする。写真は保存せず、外にも送らず、終わったらすぐ捨てる（文字の解析は core/receipt-parse.js、画素の計算は core/receipt-image.js）
-// 依存: util.js, model.js, receipt-parse.js, receipt-image.js, dom.js
+// 依存: util.js, model.js, receipt-dict.js, receipt-parse.js, receipt-image.js, dom.js
 // 実行時: edit.js
 // 公開: なし
 
@@ -184,7 +184,8 @@ $("receiptFile").onchange = async (e) => {
     await loadOcr();
     worker = await makeWorker(say);
     await worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });        // 6＝ひとかたまりの文字として読む（金額が品名と同じ行に残る）
-    const run = async (canvas, ms) => parseReceipt((await within(worker.recognize(canvas), ms, "timeout")).data.text);
+    const dict = state.entries.length ? rcBuildDict(state.entries) : undefined;                          // 過去の記録の品名・店名の辞書（読み取りの開始時に1回だけ作る。保存・常駐はしない）
+    const run = async (canvas, ms) => parseReceipt((await within(worker.recognize(canvas), ms, "timeout")).data.text, dict);
     say("読み取り中…");
     const [p1, p2] = c2 ? [c2, c1] : [c1, null];                      // 先に影に強い白黒で読む（白黒にできなかったときは写真のまま）
     let r = await run(p1, 100000);

@@ -1,8 +1,9 @@
 "use strict";
 // ===== レシートの文字の解析 =====
 // 役割: 読み取った文字を整え（字の間の空白・数字の読み違い）、品目・金額・合計・日付・お店・支払い方法を取り出す。合計と日付は候補も返す（写真を読む部分は features/receipt.js）。
-//       レシートの決まった形（店名・住所 → 品目 → 小計・税 → 合計 → 支払い → 控え）を手がかりにする。カード番号・承認番号などの数字は取り出さない
-// 依存: util.js, guard.js
+//       レシートの決まった形（店名・住所 → 品目 → 小計・税 → 合計 → 支払い → 控え）を手がかりにする。カード番号・承認番号などの数字は取り出さない。
+//       読み取り後の補正（追加の読み取りなし）：品名・店名は receipt-dict.js の履歴＋内蔵辞書で近似補正（dict 引数）、日付は1桁の読み違い・曜日で、金額は検算・税率別の対象額と税額・合計と支払いの一致で直す。確信が低ければ読んだまま
+// 依存: util.js, guard.js, receipt-dict.js
 // 実行時: なし
 // 公開: parseReceipt, mergeReceipts, receiptCard, rcScore
 
@@ -11,6 +12,7 @@ const RC_Z2H = (s) => s.replace(/[\u2460-\u2473]/g, (c) => String(c.charCodeAt(0
 // 1行を整える。日本語の文字どうしの間の空白を取り（読み取りは字の間に空白を入れやすい）、数字の中の O・l を数字に直す
 function cleanLine(l) {
   l = RC_Z2H(l).replace(/[ \t\u3000]+/g, " ").trim().replace(/^(?:45|49)\d{11}(?!\d) ?(?=\S)(?!JAN)/i, "").replace(/ [やギ半羊洋キ](?=(?:\d{1,3}(?:[,.]\d{3})+|\d{2,})(?:円)?$)/, " ¥");   // 行末の金額の ¥ が「や」「半」などに読まれたとき
+  l = l.replace(/(\D) \d(?=\\\d)/g, "$1 ");                                                          // 「3\99」：¥ の前に付いた1桁の読み違い（数字と \ がくっついた形は、ふつうの数量の書き方ではない）
   l = l.replace(/(\d) ?[一ー] ?(?=\d)/g, "$1-");
   l = l.replace(/(^|[ \-])[Y\\](?=\d)/g, "$1¥");                                                     // ¥ が Y や \ に読まれたとき
   l = l.replace(/[▲△▽]\s?(?=[¥\\]?\s?\d)/g, "-").replace(/-\s?([¥\\])\s?(?=\d)/g, "$1-");                          // ▲100・-¥238 → ¥-100（マイナスの金額）
@@ -184,59 +186,10 @@ function pickStore0(lines) {
   if (chain) return best && rcHas(best, chain) && /店$/.test(best) ? best : branch && rcHas(branch, chain) ? branch : chain + (branch ? " " + branch : "");
   return branch && !RC_STORE_GOOD.test(best) ? branch : best || branch;
 }
-// 支店名「◯◯店」の◯◯が、主な市区町村の名前と1字だけ似た字でずれているときは、その名前に直す（その名前が一覧にあって、直し方が1通りのときだけ）
-const RC_CITIES = new Set("札幌 函館 旭川 青森 八戸 盛岡 仙台 秋田 山形 福島 郡山 水戸 つくば 宇都宮 前橋 高崎 さいたま 川越 川口 所沢 越谷 千葉 船橋 柏 松戸 市川 市原 浦安 八王子 町田 立川 府中 調布 三鷹 横浜 川崎 相模原 横須賀 藤沢 平塚 厚木 新潟 長岡 富山 金沢 福井 甲府 長野 松本 岐阜 大垣 静岡 浜松 沼津 豊橋 岡崎 名古屋 一宮 春日井 豊田 刈谷 安城 四日市 大津 草津 京都 宇治 大阪 堺 豊中 吹田 高槻 枚方 神戸 姫路 西宮 尼崎 明石 奈良 和歌山 鳥取 松江 岡山 倉敷 広島 福山 山口 下関 徳島 高松 松山 今治 高知 福岡 北九州 久留米 佐賀 長崎 佐世保 熊本 大分 別府 宮崎 鹿児島 那覇 沖縄 東京 品川 渋谷 新宿 池袋 上野 目黒 世田谷 練馬 板橋 足立 江戸川 葛飾 町田 日野 小平 青梅 茅ヶ崎 小田原 鎌倉 逗子 大和 海老名 伊勢崎 太田 足利 小山 土浦 取手 草加 春日部 上尾 熊谷 大宮 浦和 蕨 戸田 習志野 佐倉 成田 木更津 袖ヶ浦 磐田 掛川 藤枝 島田 焼津 三島 熱海 高山 多治見 各務原 可児 瀬戸 半田 碧南 知立 西尾 蒲郡 津島 稲沢 小牧 犬山 桑名 鈴鹿 松阪 伊勢 彦根 長浜 守山 栗東 亀岡 長岡京 八幡 茨木 守口 寝屋川 八尾 河内長野 泉大津 岸和田 加古川 宝塚 伊丹 川西 三田 天理 橿原 生駒 田辺 米子 出雲 浜田 津山 玉野 尾道 三原 東広島 周南 宇部 萩 鳴門 丸亀 坂出 新居浜 西条 宇和島 南国 北九州 飯塚 大牟田 唐津 諫早 大村 八代 玉名 日田 延岡 都城 霧島 薩摩川内 浦添 宜野湾 名護".split(" "));
-function rcFixBranch(s) {
-  const m = String(s).match(/^(.*?)([\u3400-\u9fff]{2,4})店$/);
-  if (!m || RC_CITIES.has(m[2])) return s;
-  const hit = [...RC_CITIES].filter((c) => c.length === m[2].length && rcWDist(m[2], c) === 0.5);
-  return hit.length === 1 ? m[1] + hit[0] + "店" : s;
-}
-function pickStore(lines) { return rcFixBranch(pickStore0(lines)); }
 // 品名の先頭の印（*・A*・※ など、軽減税率や値引きの印）を落とす
 const rcName = (n) => n.replace(/^["'`“”]+/, "").replace(/^(?:[A-Za-z]{0,2}[*※]+|[A-Za-z][xk](?= )|[xX](?= ))\s*(?=[^\x00-\x7f])/, "").replace(/^[・*|\-.]+/, "").trim();
 
 // ---- 文字の後処理（確信が高いときだけ直す。確信が低ければ読んだまま） ----
-// 似た字：同じ組の字は読み違えやすい（ずれの大きさ 0）。ゆるい組は 0.5
-const RC_SAME = ["ー-−‐―一ｰ", "ヘへ", "ロ口", "カ力", "トト卜", "ハ八", "ニ二", "エ工", "タ夕", "0O○", "1lI|", "5S", "8B"];
-const RC_SOFT = ["ッツンソシ", "ポボパバ", "クケ", "ゴコ", "プブ", "ビピ", "ペベ", "里理", "ワフ", "ゥウ", "ャヤ", "ュユ", "ョヨ"];
-const RC_KANJI = ["刈切汗苅", "谷容", "橋矯", "東束", "浜演"];                                                     // 形がよく似て、どちらも実在の地名に使われにくい組だけ（支店名の補正にも使う）
-const rcGroupOf = (gs) => { const m = {}; gs.forEach((g, i) => { for (const c of g) m[c] = i; }); return m; };
-const RC_SAME_OF = rcGroupOf(RC_SAME), RC_SOFT_OF = rcGroupOf(RC_SOFT.concat(RC_KANJI));
-// 似た字を軽く数える編集距離（同じ組 0・ゆるい組 0.5・それ以外 1）
-function rcWDist(a, b) {
-  let p = Array.from({ length: b.length + 1 }, (_, j) => j);
-  for (let i = 1; i <= a.length; i++) {
-    const c = [i];
-    for (let j = 1; j <= b.length; j++) {
-      const x = a[i - 1], y = b[j - 1];
-      const sub = x === y || (RC_SAME_OF[x] !== undefined && RC_SAME_OF[x] === RC_SAME_OF[y]) ? 0 : RC_SOFT_OF[x] !== undefined && RC_SOFT_OF[x] === RC_SOFT_OF[y] ? 0.5 : 1;
-      c[j] = Math.min(p[j] + 1, c[j - 1] + 1, p[j - 1] + sub);
-    }
-    p = c;
-  }
-  return p[b.length];
-}
-// レシートによく出る言葉・よくある品名（小さな読み違いだけを直す）。値引き系は「…値引」「…割引」で終わる名前が対象
-const RC_WORDS = ["クーポン値引", "クーポン割引", "ポイント値引", "ポイント割引", "会員割引", "会員値引", "店内値引", "全品割引", "割引券", "値引券", "レジ袋", "買物袋", "ポリ袋", "消費税", "軽減税率", "お買上げ", "ポイント", "クーポン",
-  "牛乳", "豆腐", "たまご", "食パン", "納豆", "ヨーグルト", "バナナ", "キャベツ", "トマト", "ミニトマト", "じゃがいも", "玉ねぎ", "にんじん", "ほうれん草", "鶏もも肉", "鶏むね肉", "豚バラ肉", "豚こま肉", "合挽き肉", "おにぎり", "サンドイッチ", "お弁当", "カップ麺", "ティッシュ", "トイレットペーパー",
-  "食器用洗剤", "洗濯洗剤", "柔軟剤", "歯みがき粉", "シャンプー", "コンディショナー", "ボディソープ", "ハンドソープ", "ラップ", "ミネラルウォーター", "お茶", "コーヒー", "ポテトチップス", "チョコレート", "ビール", "発泡酒", "サラダチキン", "ペットボトル", "アイスクリーム", "ミルクティー",
-  "マヨネーズ", "ケチャップ", "しょうゆ", "味噌汁", "インスタントコーヒー", "ハンバーグ", "から揚げ", "食用油", "オレンジジュース", "炭酸水", "ウーロン茶", "緑茶", "ソーセージ", "ベーコン", "ウインナー"];
-// 品名を直す：先頭の英字1〜2字（「D クーポン」のD）は残し、残りが言葉に近いときだけ置き換える。同じくらい近い言葉が2つあるときは直さない
-function rcFixWord(n) {
-  const m = n.match(/^([A-Za-z]{1,2})?(.*)$/), lead = m[1] || "", s = m[2];
-  if (s.length < 3 || RC_WORDS.includes(s)) return n;
-  let best = null, bd = 9, second = 9;
-  for (const w of RC_WORDS) {
-    if (Math.abs(w.length - s.length) > (/(?:値引|割引)$/.test(w) ? 2 : 0)) continue;                 // 一般の言葉は同じ字数のときだけ（「おにぎり鮭」を「おにぎり」にしない）
-    const d = rcWDist(s, w);
-    if (d < bd) { second = bd; bd = d; best = w; } else if (d < second) second = d;
-  }
-  if (!best) return n;
-  const vague = /(?:値引|割引)$/.test(best);                                                    // 値引き系は、最後の2字が合っているときだけ（語尾が確かなので多めに許す）
-  const lim = vague ? (/(?:値引|割引)$/.test(s) ? best.length * 0.34 : -1) : s.length >= 8 ? 2 : s.length >= 4 ? 1 : 0;
-  return bd <= lim && bd > 0 && second - bd >= 0.5 ? lead + best : n;
-}
 // 文脈で直す（カタカナの中の漢字のような字・ひらがなの中のカタカナのような字・つなぎの記号・英字の中の数字）
 function rcFixKana(n) {
   const kata = (c) => !!c && /[ァ-ー・]/.test(c), hira = (c) => !!c && /[ぁ-ゟ]/.test(c);
@@ -252,7 +205,7 @@ function rcFixKana(n) {
   return arr.join("");
 }
 // 品名の整え：文脈の補正 → 言葉の近似補正（確信が高いときだけ）
-const rcPolish = (n) => rcFixWord(rcFixKana(n));
+const rcPolish = (n) => rcFixDiscount(rcFixKana(n));
 // 金額の読み違いの候補：先頭の「1」の読み落とし（99→199）と、似た数字の取り違え（1と7・0と8・5と6・3と8 など）を1か所だけ
 const RC_DIGIT_ALT = { 0: "869", 1: "7", 2: "7", 3: "85", 4: "9", 5: "63", 6: "580", 7: "1", 8: "0369", 9: "480" };
 function rcPriceAlts(p) {
@@ -273,10 +226,10 @@ function rcMergeCoupons(items) {
   for (const i of items) { delete i.d; delete i.m; }
 }
 // 検算：品目の合計が合計・小計と合わないとき、1品目の金額だけを直して合うなら直す（直し方が1通りに決まるときだけ）。直した数を返す
-function rcFixPrices(items, subs, total, taxes) {
+function rcFixPrices(items, subs, total, taxes, alts) {
   const sum = items.reduce((a, i) => a + i.p, 0), ts = taxes || [], tsum = ts.reduce((a, t) => a + t, 0);
   if (!items.length || !total || subs.includes(sum)) return 0;
-  const fits = (v) => v === total || ts.includes(total - v) || (ts.length > 1 && total - v === tsum);
+  const fits = (v) => v === total || ts.includes(total - v) || (ts.length > 1 && total - v === tsum) || (alts || []).includes(v);       // alts：税率ごとの対象額の合計（外税の小計）
   if (fits(sum)) return 0;
   const sols = [];
   items.forEach((it, i) => { for (const c of rcPriceAlts(it.p).concat(it.m && it.p > 0 ? [-it.p] : [])) if (fits(sum - it.p + c)) sols.push([i, c]); });   // 値引きの名前なのに金額が正：マイナスが読めなかったかもしれない
@@ -284,19 +237,40 @@ function rcFixPrices(items, subs, total, taxes) {
   items[sols[0][0]].p = sols[0][1];
   return 1;
 }
-function parseReceipt(text) {
+// 日付の1桁の読み違いの候補：今日の前後（今日から1年以内・翌日まで）で実在する日付のうち、曜日が読めていれば曜日が合うものを、今日に近い順に返す。元の日付が妥当（範囲内・曜日が合う）なら空
+function rcDateAlts(d, wd, today, short) {
+  const lo = addDays(today, -365), hi = addDays(today, 1), wdOK = (x) => !wd || "日月火水木金土"[new Date(+x.slice(0, 4), +x.slice(5, 7) - 1, +x.slice(8)).getDay()] === wd;
+  const [y, m, dd] = d.split("-"), c = new Set(), add = (a, b, e) => { const s = a + "-" + b + "-" + e; if (+b >= 1 && +b <= 12 && +e >= 1 && +e <= new Date(+a, +b, 0).getDate() && s >= lo && s <= hi && wdOK(s)) c.add(s); };
+  const near = (x) => Math.abs(daysBetween(x, today));
+  if (d >= lo && d <= hi && wdOK(d)) {                                                                    // 範囲内で曜日も合う：「1月」「1日」と読めた（11の1つ読み落とし）ときだけ、今日にずっと近い11月・11日を候補にする
+    if (!short) return [];
+    if (short[0]) add(y, "11", dd);
+    if (short[1]) add(y, m, "11");
+    const r = [...c].filter((x) => near(x) + 60 < near(d));
+    return r.length === 1 ? r : [];
+  }
+  const digits = y + m + dd;
+  for (let i = 0; i < 8; i++) for (const x of RC_DIGIT_ALT[digits[i]]) { const v = digits.slice(0, i) + x + digits.slice(i + 1); add(v.slice(0, 4), v.slice(4, 6), v.slice(6)); }
+  if (m[0] === "0") add(y, "1" + m[1], dd);                                                                // 先頭の「1」の読み落とし（1月→11月・1日→11日）
+  if (dd[0] === "0") add(y, m, "1" + dd[1]);
+  if (m === "01") for (const x of ["10", "12"]) add(y, x, dd);
+  return [...c].sort((a, b) => Math.abs(daysBetween(a, today)) - Math.abs(daysBetween(b, today)) || (a < b ? 1 : -1)).slice(0, 4);
+}
+function parseReceipt(text, dict) {
   const today = todayStr(), lines = cleanReceiptText(text);
   const out = { store: "", date: "", total: 0, items: [], dates: [], totals: [], pay: "", brand: "", taxes: [], guess: false, fixed: 0 };
-  const dates = [], strong = [], weak = [], paid = [], taxes = [], after = [], bare = [], seen = [];
+  const dates = [], strong = [], weak = [], paid = [], taxes = [], after = [], bare = [], seen = [], wdOf = {}, shortOf = {}, bases = {}, taxr = {};
   let pendName = "", wantTotal = false, done = false, last = null, sub = false, stop = false, cashIn = 0, cashOut = 0, refund = false;
   let li = -1, lastAt = -9;
   for (const l of lines) {
     li++;
-    if (!/TEL|電話/i.test(l)) for (const d of findDates(l, today)) if (!dates.includes(d)) dates.push(d);
+    if (!/TEL|電話/i.test(l)) { const wd = (l.match(/[(（]\s?([日月火水木金土])\s?[)）]/) || [])[1]; const sm = l.match(/(?:^|\D)(20\d{2})\s*[年\/.\-]\s*(\d{1,2})\s*[月\/.\-]\s*(\d{1,2})(?!\d)/); for (const d of findDates(l, today)) { if (!dates.includes(d)) dates.push(d); if (wd) wdOf[d] = wd; if (sm && d === sm[1] + "-" + pad(+sm[2]) + "-" + pad(+sm[3])) shortOf[d] = [sm[2] === "1", sm[3] === "1"]; } }
     for (const [k, re] of RC_PAYS) if (re.test(l) && (!out.pay || RC_PAYS.findIndex((x) => x[0] === k) < RC_PAYS.findIndex((x) => x[0] === out.pay))) out.pay = k;
     for (const [b, re] of RC_BRANDS) if (!out.brand && re.test(l)) out.brand = b;
     if (looksSensitive(l) || RC_JAN.test(l.replace(/ /g, "")) || (/(?:^|\D)\d{4}[ -]\d{4}(?!\d)/.test(l) && !timeOnlyLine(l, today))) continue;   // 数字の一部が読めなくても、4桁ずつ区切られた番号（カード・会員）らしい行は捨てる                               // カード番号・会員番号・電話番号・バーコードの数字の行は読み捨てる
     if (RC_STOP.test(l) && (out.items.length || sub || done)) stop = true;                            // 「お買上点数」「売上票」から下は品目ではない
+    const tc = l.match(/(\d{1,2})\D{0,2}[%％]+\s?対象\s*[¥\\]?\s?(\d[\d,]*)\s*税\s*[¥\\]?\s?(\d[\d,]*)/);          // 「(8%対象 ¥336 税 ¥26)」：税率ごとの対象額と税額が1行に並ぶ形
+    if (tc) { bases[+tc[1]] = rcNum(tc[2]); taxr[+tc[1]] = rcNum(tc[3]); taxes.push(rcNum(tc[3])); continue; }
     if (l.length <= 14 && /^.{0,4}(?:返品|取消|キャンセル|返金)/.test(l) && !/の際|ください/.test(l)) refund = true;             // 返品・取消のレシートは、マイナスの金額も品目・合計にする
     const m = l.replace(/(\d) ?, ?(\d{3})/g, "$1,$2").match(RC_PRICE);
     const timeOnly = timeOnlyLine(l, today);
@@ -325,6 +299,8 @@ function parseReceipt(text) {
     if (!head && wantTotal) { strong.push(price); done = true; wantTotal = false; continue; }          // 前の行が「合計」だけだった
     if (/小計/.test(name)) { weak.push(price); sub = true; wantTotal = false; continue; }
     wantTotal = false;
+    const mb = name.match(/(\d{1,2})\D{0,2}[%％]+\s?対象/), mt = name.match(/(\d{1,2})\D{0,2}[%％]+\s?(?:消費)?税/);       // 「8%対象額」「8%税額」（税率ごとの対象額・税額）
+    if (mb && price > 0) bases[+mb[1]] = price; else if (mt && price > 0) taxr[+mt[1]] = price;
     if ((RC_TAX.test(name) && !/対象/.test(name)) || /対象.*税$/.test(name)) { if (price > 0) taxes.push(price); continue; }      // 「(8%対象 ¥336 税 ¥26)」も税額
     const pk = RC_PAYS.find(([, re]) => re.test(name));
     if (pk) {                                                         // 支払いの行（クレジット ¥452・お預り・お釣り）
@@ -369,20 +345,45 @@ function parseReceipt(text) {
   const pool = st.length ? st : paid.length ? paid : outer.length ? outer : weak.length ? weak : bareTotal;
   let first = pool.includes(sum) ? sum : pool[0] || 0;
   if (!st.length && paid.length && outer.length && !paid.includes(first)) first = paid[0];
+  // 税率ごとの対象額・税額の整合（8%・10%）と、合計・支払い・小計＋税額の一致で、合計の読み違いを直す：対象額の合計＝小計、税額＝対象額×税率（切り捨て）、小計＋税額＝合計。2つ以上の元が同じ額なのに、選んだ合計だけが違うときは、その額にする
+  const bk = Object.keys(bases).map(Number), basesSum = bk.reduce((a, r) => a + bases[r], 0), taxSum = Object.keys(taxr).reduce((a, r) => a + taxr[r], 0);
+  const taxOk = bk.length > 0 && bk.every((r) => taxr[r] === undefined || taxr[r] === Math.floor((bases[r] * r) / 100) || taxr[r] === Math.floor((bases[r] * r) / (100 + r)));
+  const calc = taxOk && taxSum > 0 && basesSum > 0 ? basesSum + taxSum : 0, vote = {};
+  const sub1 = sub0 ? taxes.map((x) => sub0 + x).concat(Object.keys(taxr).length > 1 ? [sub0 + taxSum] : []).find((v) => v === paid[0]) || 0 : 0;       // 支払い＝小計＋税額
+  for (const v of [st[0], paid[0], calc, sub0 && taxSum ? sub0 + taxSum : 0, sub1]) if (v) vote[v] = (vote[v] || 0) + 1;
+  const top = Object.keys(vote).map(Number).sort((a, b) => vote[b] - vote[a])[0];
+  if (top && top !== first && vote[top] >= 2 && !(vote[first] >= 2)) first = top;
   rcDropTotal(out.items, first);
-  out.fixed = rcFixPrices(out.items, weak, first, taxes);                                              // 検算で直した品目の数
+  out.fixed = rcFixPrices(out.items, weak, first, taxes, bk.length && taxOk ? [basesSum] : []);                                              // 検算で直した品目の数
   rcMergeCoupons(out.items);
+  for (const i of out.items) i.n = rcFixName(i.n, dict);                                              // 履歴・内蔵の辞書で品名を直す（確信が高いときだけ）
   out.total = first; out.taxes = taxes;
   rcTax(out);
-  out.totals = [...new Set([first].concat(st, paid, weak).filter(Boolean))].slice(0, 4);
+  const asum = out.items.filter((i) => i.n !== "消費税").reduce((a, i) => a + i.p, 0);
+  out.totals = [...new Set([first].concat(st, paid, weak, first && asum > 0 && asum !== first && rcPriceAlts(first).includes(asum) ? [asum] : []).filter(Boolean))].slice(0, 4);   // 品目の合計が、合計の1桁の読み違いの候補なら、候補にも出す
   if (out.pay !== "credit") out.brand = "";
   // 日付：先の日付（読み違い）は後ろに回し、年が違いすぎるときは今年にした日付も候補に足す
   const ok = (d) => d <= addDays(today, 1) && d >= addDays(today, -800);
-  const good = dates.filter(ok), bad = dates.filter((d) => !ok(d));
+  let good = dates.filter(ok), bad = dates.filter((d) => !ok(d));
+  // 日付の読み違いの補正：未来・1年以上前の日付、または読めた曜日と合わない日付は、1桁の読み違い（1と7・0と8 など）や月の先頭の「1」の読み落とし（11月→1月）の候補のうち、今日に近い妥当な日付にする（曜日が読めていれば曜日で検算。複数あれば、いちばん近いものを選び、ほかは候補に出す）
+  const first0 = good[0] || bad[0];
+  if (first0) {
+    const wd = wdOf[first0], ty = Number(today.slice(0, 4));
+    let cs = rcDateAlts(first0, wd, today, shortOf[first0]).filter((d) => d !== first0), yl = [];
+    const inRange = first0 >= addDays(today, -365) && first0 <= addDays(today, 1);
+    if (Number(first0.slice(0, 4)) === ty - 1 && inRange) {                                           // 年なしの日付が先の日付で、去年にされたもの：今年の同じ月日の1桁違い（今日に近いもの）を探す
+      const d2 = ty + first0.slice(4);
+      if (d2 > addDays(today, 1)) yl = rcDateAlts(d2, wd, today).filter((d) => d !== first0);
+    }
+    if (yl.length) { good = yl.concat(good.filter((d) => !yl.includes(d))); out.guess = true; }
+    else
+    if (cs.length && inRange && cs.length > 1 && !good.includes(cs[0])) good = [first0].concat(cs, good.filter((d) => d !== first0));      // 範囲内で候補が複数：元の日付を先頭に、候補を後ろに出す（曜日・月の読み違いかもしれない）
+    else if (cs.length) { good = cs.concat(good.filter((d) => !cs.includes(d))); out.guess = true; }   // 候補が1つ、または元の日付が範囲外：今日にいちばん近い候補を先頭にする（元の日付は候補の後ろに残す）
+  }
   if (!good.length && bad.length) { const b = bad[0], y = Number(today.slice(0, 4)); for (const yy of [y, y - 1]) { const c = yy + b.slice(4); if (ok(c) && !good.includes(c)) good.push(c); } out.guess = good.length > 0; }   // guess：年を推し量った日付（読み違いかもしれない）
   out.dates = good.concat(bad).slice(0, 4);
   out.date = good[0] || "";
-  out.store = pickStore(lines);
+  out.store = rcFixStore(pickStore0(lines), dict, RC_CHAINS.map((c) => c[0]));
   if (!out.total && !out.date && !RC_STORE_GOOD.test(out.store)) out.store = "";                       // 合計も日付も読めない（崩れた読み取り）ときは、お店の名前も信じない
   return out;
 }

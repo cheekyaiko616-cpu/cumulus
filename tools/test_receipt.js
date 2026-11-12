@@ -5,13 +5,14 @@
 "use strict";
 const fs = require("fs"), vm = require("vm"), path = require("path");
 const root = path.resolve(__dirname, "..");
-for (const f of ["util", "guard", "receipt-image", "receipt-parse"]) vm.runInThisContext(fs.readFileSync(path.join(root, "js/core", f + ".js"), "utf8"), { filename: f + ".js" });
+for (const f of ["util", "guard", "receipt-image", "receipt-dict", "receipt-parse"]) vm.runInThisContext(fs.readFileSync(path.join(root, "js/core", f + ".js"), "utf8"), { filename: f + ".js" });
 
 let ok = 0, ng = 0;
 const eq = (name, got, want) => {
   const a = JSON.stringify(got), b = JSON.stringify(want);
   if (a === b) ok++; else { ng++; console.log("  不合格: " + name + "\n    期待 " + b + "\n    実際 " + a); }
 };
+const rcPolishAll = (n) => rcFixName(rcPolish(n));
 const names = (r) => r.items.map((i) => i.n + ":" + i.p);
 const thisYear = todayStr().slice(0, 4);
 
@@ -108,7 +109,7 @@ const DISC = "領収書\nディスカウントショップ\nいいいいン徹�
 {
   const r = parseReceipt(DISC);
   eq("実例：合計は支払い（クレジット）の額。小計は合計にしない", r.total, 452);
-  eq("実例：品目（住所・バーコード・税・支払い・控えの行は入れず、外税は消費税の行）", names(r), ["ポテトスナック:99", "ヒレジ袋 3円:3", "チョコ菓子:118", "ポテトチップス:199", "消費税:33"]);
+  eq("実例：品目（住所・バーコード・税・支払い・控えの行は入れず、外税は消費税の行）", names(r), ["ポテトスナック:99", "レジ袋:3", "チョコ菓子:118", "ポテトチップス:199", "消費税:33"]);
   eq("実例：日付・支払い・カードの会社", [r.date, r.pay, r.brand], ["2026-11-11", "credit", "JCB"]);
   eq("実例：店名は崩れた文字や「領収書」でなく支店名", r.store, "架空店");
   eq("実例：控えの番号（カード会社）は使わない", JSON.stringify(r).includes("12345"), false);
@@ -1048,14 +1049,14 @@ eq("お店の名前：ガソリンの種類・テーブルは名前にしない"
   eq("検算：直し方が2通り以上あるときは直さない", (() => { const r = parseReceipt("あおぞら商店\n2026/11/05\nパン ¥99\n牛乳 ¥99\n小計 ¥298\n合計 ¥298"); return [names(r), r.fixed]; })(), [["パン:99", "牛乳:99"], 0]);
   eq("検算：もともと合っていれば直さない", parseReceipt("あおぞら商店\n2026/11/05\nパン ¥99\n牛乳 ¥168\n小計 ¥267\n合計 ¥267").fixed, 0);
   eq("検算：値引きの名前なのにマイナスが読めない行は、合うときだけマイナスにする", (() => { const r = parseReceipt("あおぞら商店\n2026/11/05\nパン ¥300\n牛乳 ¥200\n割引 ¥50\n小計 ¥450\n合計 ¥450"); return [names(r), r.fixed]; })(), [["パン:300", "牛乳:150"], 1]);
-  eq("支店名：主な市区町村と1字だけ似た字でずれていれば直す・それ以外は読んだまま", [rcFixBranch("汗谷店"), rcFixBranch("ドン・キホーテ 切谷店"), rcFixBranch("刈谷店"), rcFixBranch("鐘谷店"), rcFixBranch("駅前店"), rcFixBranch("大田店")], ["刈谷店", "ドン・キホーテ 刈谷店", "刈谷店", "鐘谷店", "駅前店", "大田店"]);
+  eq("支店名：主な市区町村と1字だけ似た字でずれていれば直す・それ以外は読んだまま", [rcFixStore("汗谷店"), rcFixStore("ドン・キホーテ 切谷店"), rcFixStore("刈谷店"), rcFixStore("鐘谷店"), rcFixStore("駅前店"), rcFixStore("大田店")], ["刈谷店", "ドン・キホーテ 刈谷店", "刈谷店", "刈谷店", "駅前店", "大田店"]);
   eq("品名の次の行の1桁の数字だけ（¥・円なし）は金額にしない", names(parseReceipt("ストアひなた 架空店\n2026/11/06\n店語っ人各 すす\n 5\n豚ロース ¥930\n合計 ¥930")), ["豚ロース:930"]);
   eq("2回の結果：欠けたお店の名前は、もう一方の長い名前で補う", mergeReceipts(parseReceipt("みなと\n2026/11/09\nコーヒー ¥560\n合計 ¥560"), parseReceipt("珈琲館 みなと\n2026/11/09\nコーヒー ¥560\n合計 ¥560")).store, "珈琲館みなと");
   eq("2回の結果：合計が小計と同じ額のものより、小計＋税額を読めたほうを使う", (() => { const a = parseReceipt("あおぞら商店\n2026/11/09\nパン ¥300\n牛乳 ¥200\n小計 ¥500\n消病税 ¥50\n合計 ¥500 6"), b = parseReceipt("あおぞら商店\n2026/11/09\nパン ¥300\n牛乳 ¥200\n小計 ¥500\n消費税 ¥50\n合計 ¥550"); const m = mergeReceipts(a, b); return [m.total, names(m)]; })(), [550, ["パン:300", "牛乳:200", "消費税:50"]]);
-  eq("品名：読み違いの記号が近い言葉は直す（クーポン値引）", [rcPolish("Dク-ポボッ値引"), rcPolish("クーポン値引"), rcPolish("牛乳")], ["Dクーポン値引", "クーポン値引", "牛乳"]);
-  eq("品名：確信が低いものは読んだまま（別の言葉に変えない）", [rcPolish("2-ポパッ値引"), rcPolish("牛肉"), rcPolish("チョコ菓子"), rcPolish("あおぞら")], ["2-ポパッ値引", "牛肉", "チョコ菓子", "あおぞら"]);
-  eq("品名：1字違いの一般的な言葉は直す（長い言葉だけ）", [rcPolish("ポテトチツプス"), rcPolish("ヨーグルド"), rcPolish("ヨーグルト")], ["ポテトチップス", "ヨーグルト", "ヨーグルト"]);
-  eq("品名：カタカナの中の漢字・記号のような字は文脈で直す", [rcPolish("ヘ口ヘ口"), rcPolish("コーヒー牛乳"), rcPolish("ポテト-チップ")], ["ヘロヘロ", "コーヒー牛乳", "ポテトーチップ"]);
+  eq("品名：読み違いの記号が近い言葉は直す（クーポン値引）", [rcPolishAll("Dク-ポボッ値引"), rcPolishAll("クーポン値引"), rcPolishAll("牛乳")], ["Dクーポン値引", "クーポン値引", "牛乳"]);
+  eq("品名：確信が低いものは読んだまま（別の言葉に変えない）", [rcPolishAll("2-ポパッ値引"), rcPolishAll("牛肉"), rcPolishAll("チョコ菓子"), rcPolishAll("あおぞら")], ["2-ポパッ値引", "牛肉", "チョコ菓子", "あおぞら"]);
+  eq("品名：1字違いの一般的な言葉は直す（長い言葉だけ）", [rcPolishAll("ポテトチツプス"), rcPolishAll("ヨーグルド"), rcPolishAll("ヨーグルト")], ["ポテトチップス", "ヨーグルト", "ヨーグルト"]);
+  eq("品名：カタカナの中の漢字・記号のような字は文脈で直す", [rcPolishAll("ヘ口ヘ口"), rcPolishAll("コーヒー牛乳"), rcPolishAll("ポテト-チップ")], ["ヘロヘロ", "コーヒー牛乳", "ポテトーチップ"]);
 }
 
 // ---- 写真の計算（receipt-image.js） ----
@@ -1125,6 +1126,51 @@ eq("縮小の大きさ", [fitSize(4032, 3024, 3000, 7e6), fitSize(3024, 4032, 30
   for (let r = 0; r < 5; r++) for (let c = 0; c < 12; c++) for (let y = 20 + r * 70; y < 50 + r * 70; y++) for (let x = 20 + c * 45; x < 40 + c * 45; x++) g[y * w + x] = 0;
   eq("文字の高さの目安", textHeight(g, w, h), 30);
   eq("文字がないときは0", textHeight(new Uint8Array(w * h).fill(255), w, h), 0);
+}
+
+// ---- 履歴の辞書（保存した記録の品名・店名）と内蔵の辞書による近似補正（架空の記録・品名） ----
+{
+  const hist = rcBuildDict([
+    { date: "2026-10-01", store: "スーパーあおば 北店", items: [{ n: "しろくま煮込みスープ", p: 298 }, { n: "ミルクビスケット", p: 158 }, { n: "お茶 500ml", p: 110 }, { n: "レジ袋 3円", p: 3 }] },
+    { date: "2026-10-08", store: "スーパーあおば 北店", items: [{ n: "しろくま煮込みスープ", p: 298 }, { n: "ミルクビスケット", p: 158 }] },
+    { date: "2026-10-09", store: "ミルクビスケット屋 東店", items: [{ n: "ミルクビスケット大袋", p: 258 }] }]);
+  const f = (n) => rcFixName(n, hist);
+  eq("履歴：1字違い・かなの似た字は過去の表記に直す", [f("しろくま煮込みスーブ"), f("しろくま煮込みスープ"), f("ミルクヒスケット")], ["しろくま煮込みスープ", "しろくま煮込みスープ", "ミルクビスケット"]);
+  eq("履歴：行頭・行末の余分な字と、行末の単価の注記", [f("ヒミルクビスケット"), f("ミルクビスケットギ"), f("お茶 500mL 半"), f("レジ袋 9円")], ["ミルクビスケット", "ミルクビスケット", "お茶 500ml", "レジ袋 9円".replace(" 9円", "")]);
+  eq("履歴：別の商品（字の抜け・余分・別の字）は直さない", [f("ミルクビスケット大袋"), f("ミルクビスケット黒"), f("ミルクビスケ"), f("しろくま煮込みカレー")], ["ミルクビスケット大袋", "ミルクビスケット黒", "ミルクビスケ", "しろくま煮込みカレー"]);
+  eq("履歴がなくても、内蔵の辞書で似た字のずれは直す・別の商品は直さない", [rcFixName("ポテトチツプス"), rcFixName("塩ポテトチップス"), rcFixName("おにぎり梅"), rcFixName("ピール"), rcFixName("牛乳")], ["ポテトチップス", "塩ポテトチップス", "おにぎり梅", "ピール", "牛乳"]);
+  eq("店名：チェーン名・支店名を履歴と市区町村で直す（市区町村にある支店名・似ていない字は直さない）", [rcFixStore("スーパーあおば 北店", hist), rcFixStore("スーパーあおぱ 北店", hist), rcFixStore("鐘谷店"), rcFixStore("大垣店", hist), rcFixStore("スーパーあおば 兆店", hist)], ["スーパーあおば 北店", "スーパーあおば 北店", "刈谷店", "大垣店", "スーパーあおば 兆店"]);
+  eq("店名：支店名だけ読めて、その支店の店名が履歴に1種類だけなら、その店名にする", [rcFixStore("北店", hist), rcFixStore("東店", hist)], ["スーパーあおば 北店", "ミルクビスケット屋 東店"]);
+  const r = parseReceipt("スーパーあおぱ 北店\n2026年11月3日(火)10:00\nヒしろくま煮込みスーブ 3\\298\nミルクビスケット ¥158\n小計 ¥456\n合計 ¥456", hist);
+  eq("履歴つきの解析：店名・品名・金額", [r.store, names(r)], ["スーパーあおば 北店", ["しろくま煮込みスープ:298", "ミルクビスケット:158"]]);
+  eq("履歴なしの解析は、読んだまま（辞書にない品名）", names(parseReceipt("スーパーあおぱ 北店\n2026年11月3日\nしろくま煮込みスーブ ¥298\n合計 ¥298")), ["しろくま煮込みスーブ:298"]);
+}
+// ---- 日付の1桁の読み違い・曜日の検算（今日の日付から作るので、いつ実行しても同じ形になる） ----
+{
+  const t = todayStr(), wdn = (d) => "日月火水木金土"[new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8)).getDay()];
+  const dd = (s) => parseReceipt("あおぞら商店\n" + s + "\nパン ¥300\n合計 ¥300");
+  const near = addDays(t, -3), ny = near.slice(0, 4), nm = near.slice(5, 7), nd = near.slice(8);
+  if (ny.endsWith("6")) {
+    const r = dd(ny.slice(0, 3) + "8年" + nm + "月" + nd + "日(" + wdn(near) + ") 10:00");
+    eq("日付：年の1桁の読み違い（6→8）で未来になる日付は、曜日が合う今日に近い日付にする（元の日付も候補に残す）", [r.date, r.guess, r.dates.includes(ny.slice(0, 3) + "8-" + nm + "-" + nd)], [near, true, true]);
+  }
+  eq("日付：妥当で曜日も合う日付は、そのまま", (() => { const r = dd(ny + "/" + nm + "/" + nd + "(" + wdn(near) + ") 10:00"); return [r.date, r.guess]; })(), [near, false]);
+  const one = addDays(t, -1);
+  if (one.slice(5, 7) === "11") {
+    const r = dd(one.slice(0, 4) + "年1月" + one.slice(8) + "日(" + wdn(one) + ")19:34");
+    eq("日付：月の先頭の1の読み落とし（11月→1月）は、今日にずっと近い11月を先頭にする", [r.date, r.dates.includes(one.slice(0, 4) + "-01-" + one.slice(8))], [one, true]);
+  }
+}
+// ---- 税率ごとの対象額・税額と、合計・支払い・小計の三者の一致 ----
+{
+  const r = parseReceipt("あおぞら商店\n2026/11/05\nお菓子 ¥198\nパン ¥238\n小計 ¥436\n(8%対象 ¥436 税 ¥34)\n合計 ¥470\nクレジット ¥470");
+  eq("税率別：対象額の合計＝小計、税額＝対象額×8%（切り捨て）で、合計470", [r.total, r.taxes], [470, [34]]);
+  const r2 = parseReceipt("あおぞら商店\n2026/11/05\nお菓子 ¥198\nパン ¥238\n小計 ¥436\n外税 8% ¥34\n合計 ¥476\nお預り ¥1,000\nお釣り ¥530");
+  eq("三者の一致：合計の行だけが違い、お預り−お釣りと小計＋税額が同じなら、そちらの額（470）", r2.total, 470);
+  const r3 = parseReceipt("あおぞら商店\n2026/11/05\nお菓子 ¥198\nパン ¥238\n小計 ¥436\n合計 ¥436\nお預り ¥1,000\nお釣り ¥564");
+  eq("三者の一致：もともと合っていれば変えない", r3.total, 436);
+  const r4 = parseReceipt("あおぞら商店\n2026/11/05\nノート ¥220\nペン ¥150\n税込合計 ¥379");
+  eq("合計が品目の合計の1桁違いのときは、品目の合計も候補に出す（直しはしない）", [r4.total, r4.totals.includes(370)], [379, true]);
 }
 
 console.log("レシートの単体試験: " + ok + "/" + (ok + ng) + " 件 合格" + (ng ? "、" + ng + " 件 不合格" : ""));
