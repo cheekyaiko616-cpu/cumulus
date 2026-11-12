@@ -130,7 +130,7 @@ function turned(c, deg) {
   g.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]); g.drawImage(c, 0, 0);
   return o;
 }
-const rcGood = (r) => !!(r.total && r.date && !r.guess && r.items.length && r.store && r.total === r.items.reduce((a, i) => a + i.p, 0));
+const rcGood = (r) => !!(r.total && r.date && !r.guess && !r.fixed && r.items.length && r.store && r.total === r.items.reduce((a, i) => a + i.p, 0));
 
 // ---- 合計・日付の候補（複数あるときだけ出す。選ぶと入力欄に入る） ----
 function clearPick() { adjRow = null; $("ocrPick").hidden = true; $("ocrPick").innerHTML = ""; }
@@ -215,7 +215,7 @@ $("receiptFile").onchange = async (e) => {
     updateTotal();
     const sum = readRows().reduce((a, i) => a + i.p, 0);
     showPick(r, sum);
-    say(!r.items.length ? OCR_MSG.noitem : r.items.length + "品目を読み取りました。" + (r.total && r.total !== sum ? "レシートの合計（" + yen(r.total) + "）と合いません。確かめてください。" : ""));
+    say(!r.items.length ? OCR_MSG.noitem : r.items.length + "品目を読み取りました。" + (r.total && r.total !== sum ? "レシートの合計（" + yen(r.total) + "）と合いません。確かめてください。" : r.fixed ? "金額を計算で直した品目があります。確かめてください。" : ""));
     $("editSheet").scrollTop = 0;                                     // 結果の案内・合計の候補が見えるよう、入力画面を先頭に戻す（読み取り中に動かしていても）
   } catch (err) {
     say(OCR_MSG[err && err.ocr] || OCR_MSG.engine);

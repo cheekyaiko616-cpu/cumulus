@@ -148,9 +148,9 @@
   <input type="file" id="receiptFile" accept="image/*" hidden>
   <p class="status" id="ocrStatus" role="status"></p>
   <div id="ocrPick" hidden></div>
-  <div class="two">
+  <div class="two one">
     <label class="f">日付<input type="date" id="eDate"></label>
-    <label class="f">お店<input type="text" id="eStore" placeholder="スーパー" autocomplete="off" enterkeyhint="next"></label>
+    <label class="f">お店<textarea class="ag" id="eStore" rows="1" placeholder="スーパー" autocomplete="off" enterkeyhint="next"></textarea></label>
   </div>
   <div>
     <div class="seg" id="paySeg" role="group" aria-label="支払い方法"><button type="button" data-pay="cash">現金</button><button type="button" data-pay="code">バーコード決済</button><button type="button" data-pay="credit">クレジット</button></div>
@@ -180,7 +180,7 @@
     <label class="f">投資した金額（円）<input type="text" id="iAmount" inputmode="numeric" placeholder="3000" autocomplete="off"></label>
   </div>
   <button class="dashed" id="iSuggest" type="button" hidden></button>
-  <label class="f">メモ（任意）<input type="text" id="iMemo" placeholder="ファンド名など" autocomplete="off" enterkeyhint="done"></label>
+  <label class="f">メモ（任意）<textarea class="ag" id="iMemo" rows="1" placeholder="ファンド名など" autocomplete="off" enterkeyhint="done"></textarea></label>
   <button class="danger-b" id="iDelete" type="button" hidden>この記録を消す</button>
   <div class="sheet-foot"><div class="foot-btns"><button class="cancel" data-close="invOverlay" type="button">キャンセル</button><button class="primary" id="iSave" type="button">保存する</button></div></div>
 </div></div>
@@ -197,7 +197,7 @@
 <!-- カードの設定 -->
 <div class="overlay" id="cardOverlay" hidden><div class="sheet has-foot gutter" id="cardSheet" role="dialog" aria-modal="true" aria-labelledby="cardTitle">
   <div class="sheet-head"><h2 id="cardTitle" style="text-align:left">カードの設定</h2></div>
-  <label class="f">カードの名前<input type="text" id="cName" maxlength="30" placeholder="楽天カード" autocomplete="off" enterkeyhint="done"></label>
+  <label class="f">カードの名前<textarea class="ag" id="cName" rows="1" maxlength="30" placeholder="楽天カード" autocomplete="off" enterkeyhint="done"></textarea></label>
   <label class="f">締め日<select id="cClose" data-pick="締め日"></select></label>
   <div class="two"><label class="f">引き落とし月<select id="cMonths" data-pick="引き落とし月"></select></label><label class="f">引き落とし日<select id="cPay" data-pick="引き落とし日"></select></label></div>
   <p class="hint" id="cRule"></p>
@@ -211,7 +211,7 @@
   <div class="sheet-head"><h2 id="mailTitle" style="text-align:left">メールから自動取り込み</h2></div>
   <div class="note" id="mailState"></div>
   <button class="dashed" id="mailGuideBtn" type="button">連携の準備（初回だけ）</button>
-  <label class="f">連携のURL<input type="text" id="mailUrl" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+  <label class="f">連携のURL<textarea class="ag" id="mailUrl" rows="1" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></label>
   <label class="f">三井住友カードの記録に使うカード<select id="mCardSmbc" data-pick="記録に使うカード"></select></label>
   <label class="f">JCBカードの記録に使うカード<select id="mCardJcb" data-pick="記録に使うカード"></select></label>
   <div class="seg" id="mailSeg" role="group" aria-label="取り込み方"><button type="button" data-a="1">自動で記録する</button><button type="button" data-a="0">確認してから記録</button></div>
