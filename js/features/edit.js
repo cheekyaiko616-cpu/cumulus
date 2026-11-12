@@ -1,6 +1,6 @@
 "use strict";
 // ===== 買い物の入力画面 =====
-// 役割: 買い物の記録の入力・直す・消す。クレジットのときの引き落とし日のお知らせと、メールで取り込み済みの同じ買い物との結び付け（レシートの二重登録を防ぐ）
+// 役割: 買い物の記録の入力・直す・消す。クレジットのときの引き落とし日のお知らせ（カードは任意で、未選択でも保存できる）と、メールで取り込み済みの同じ買い物との結び付け（レシートの二重登録を防ぐ）
 // 依存: util.js, guard.js, model.js, sample.js, billing.js, mail-plan.js, storage.js, dom.js, overlay.js
 // 実行時: day.js
 // 公開: editing, editPay, matchMode, rowHtml, readRows, updateTotal, setPay, updateCardHint, findMailMatch, updateMatch, openEdit
@@ -47,7 +47,7 @@ function updateMatch() {
 $("matchSeg").onclick = (e) => { const b = e.target.closest("[data-k]"); if (b) { matchMode = b.dataset.k; updateMatch(); } };
 function fillCards(sel) {
   const list = state.cards.map((c) => c.name); if (sel && !list.includes(sel)) list.push(sel);
-  $("eCard").innerHTML = list.length ? list.map((c) => "<option" + (c === sel ? " selected" : "") + ">" + esc(c) + "</option>").join("") : '<option value="">（設定でカードを追加できます）</option>';
+  $("eCard").innerHTML = '<option value=""' + (sel ? "" : " selected") + ">カード未選択</option>" + list.map((c) => "<option" + (c === sel ? " selected" : "") + ">" + esc(c) + "</option>").join("");   // カードは任意（未選択のまま保存できる。あとでメールの取り込みが埋める）
 }
 function openEdit(entry, date) {
   editing = entry || null; matchMode = "same";

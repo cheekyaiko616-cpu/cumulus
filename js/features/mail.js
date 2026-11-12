@@ -51,7 +51,7 @@ async function runMail(manual) {
     if (state.mail.auto) {
       const n = applyImport(plan);
       state.mail.lastNote = planNote(plan, u, mailInfo); mailPending = 0;
-      if (n) save(); else { persist(); renderMail(); }                  // 記録が増えなかったときは、書くだけ（画面は描き直さない）
+      if (n || plan.link.length) save(); else { persist(); renderMail(); }                  // 記録が増えなかったときは、書くだけ（画面は描き直さない）
       if (n) toast("メールから" + n + "件を記録しました");
       mailMsg(planNote(plan, u, mailInfo));
     } else {

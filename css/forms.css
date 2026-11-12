@@ -1,7 +1,7 @@
 /* ===== 重ねて開く画面（入力・選択）と、入力欄・ボタン・メッセージ ===== */
 .overlay { position: fixed; inset: 0; z-index: 20; background: rgba(8,20,17,.5); display: flex; align-items: flex-end; justify-content: center; }
 .overlay[hidden] { display: none; }
-.sheet { background: var(--surface); width: 100%; max-width: 520px; max-height: 90%; overflow-y: auto; overscroll-behavior: contain; border-radius: var(--r-l) var(--r-l) 0 0; padding-block: 14px calc(18px + env(safe-area-inset-bottom, 0px)); animation: up .22s ease; display: flex; flex-direction: column; gap: 12px; }
+.sheet { background: var(--surface); width: 100%; max-width: 520px; max-height: 90%; overflow-y: auto; overflow-anchor: none; overscroll-behavior: contain; border-radius: var(--r-l) var(--r-l) 0 0; padding-block: 14px calc(18px + env(safe-area-inset-bottom, 0px)); animation: up .22s ease; display: flex; flex-direction: column; gap: 12px; }
 @keyframes up { from { transform: translateY(40px); opacity: .4; } }
 .sheet-head { display: flex; align-items: center; gap: 8px; }
 .sheet-head h2 { flex: 1; margin: 0; font-size: var(--fs-l); text-align: center; }

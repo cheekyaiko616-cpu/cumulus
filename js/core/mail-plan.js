@@ -37,11 +37,12 @@ const safeStore = (s) => { s = String(s || "").trim().slice(0, 40); return looks
 const seenKeys = (it) => ["m:" + it.id, "c:" + it.issuer + " " + it.date + " " + it.time + " " + it.amount];
 
 // ---- 重複の判定 ----
-// すでにある記録（手で入れたもの）と、同じカード・同じ金額・日付が前後1日以内なら「重複」。
-// 1件の記録には1通のメールだけが対応する（同じ日に同額を2回使った場合は、件数で数える）
+// すでにある記録（手で入れたもの）と、同じ金額・日付が前後1日以内で、同じカード（または、カード未選択のクレジット）なら「重複」。
+// 1件の記録には1通のメールだけが対応する（同じ日に同額を2回使った場合は、件数で数える）。複数あれば日付が最も近い1件。
+// カード未選択の記録に当たったときは、取り込むときにメールの発行元のカードを入れる（plan.link）
 function planImport(items) {
   const seen = new Set(state.mail.seen), used = new Set();
-  const plan = { add: [], dup: [], done: [], other: [] };
+  const plan = { add: [], dup: [], done: [], other: [], link: [] };
   items.slice().sort((a, b) => (a.date + a.time + a.id) < (b.date + b.time + b.id) ? -1 : 1).forEach((it) => {
     const keys = seenKeys(it);
     if (keys.some((k) => seen.has(k))) { plan.done.push(it); return; }
@@ -50,13 +51,14 @@ function planImport(items) {
     const hit = state.entries
       .filter((e) => e.pay === "credit" && e.src !== "mail" && !used.has(e) && e.total === it.amount && Math.abs(daysBetween(e.date, it.date)) <= 1 &&
         (e.card === card || !e.card || (!card && e.card.indexOf(hint) >= 0)))
-      .sort((a, b) => Math.abs(daysBetween(a.date, it.date)) - Math.abs(daysBetween(b.date, it.date)))[0];
-    if (hit) { used.add(hit); plan.dup.push(it); return; }
+      .sort((a, b) => Math.abs(daysBetween(a.date, it.date)) - Math.abs(daysBetween(b.date, it.date)) || !a.card - !b.card)[0];   // 日付が同じなら、カードが決まっているほうを先に
+    if (hit) { used.add(hit); plan.dup.push(it); if (!hit.card) plan.link.push({ e: hit, issuer: it.issuer }); return; }
     plan.add.push(it);
   });
   return plan;
 }
 function applyImport(plan) {
+  plan.link.forEach((l) => { if (!l.e.card && state.entries.includes(l.e)) l.e.card = ensureMailCard(l.issuer); });   // カード未選択の手入力に、メールの発行元のカードを入れる
   if (!plan.add.length) return 0;
   if (state.sample) leaveSample(state.cards.map((c) => c.name));  // 見本のまま取り込むと混ざるので、見本は消す
   plan.add.forEach((it) => {
@@ -76,7 +78,7 @@ const planNote = (p, u, i) => {
 };
 
 // ---- レシートとの結び付け ----
-// レシートの入力と同じ買い物の、メールの記録を探す：同じカード・同じ合計・日付が前後1日以内で、まだレシートと結び付いていないもの
+// レシートの入力と同じ買い物の、メールの記録を探す：同じカード（レシート側が未選択なら問わない）・同じ合計・日付が前後1日以内で、まだレシートと結び付いていないもの
 function matchMailEntry(date, total, card) {
   if (!isKey(date) || total <= 0) return null;
   return state.entries
