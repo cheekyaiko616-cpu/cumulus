@@ -30,8 +30,7 @@ $("selList").onclick = (e) => {
   pickTarget = null; pickFrom = null;
   closeOv("selOverlay");                                          // 先に閉じる（待たせない）
   sel.selectedIndex = Number(b.dataset.i);
-  overlayOpenHooks.push(syncPickers);          // 画面を開くたびに、選択欄の表示を中身に合わせる
-syncPickers();
+  syncPickers();                                                  // 選択直後の1回だけ表示を合わせる
   if (from && from.blur) from.blur();                             // 押した欄に「選択中」の枠が残らないようにする
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   if (sel.value !== old) sel.dispatchEvent(new Event("change", { bubbles: true }));
@@ -40,5 +39,5 @@ document.querySelectorAll("select[data-pick]").forEach((sel) => {
   sel.insertAdjacentHTML("afterend", '<button type="button" class="selbtn" data-for="' + sel.id + '" aria-haspopup="listbox"><span></span><i aria-hidden="true">▼</i></button>');
   pickBtn(sel).onclick = (e) => openPicker(sel, e.currentTarget);
 });
-overlayOpenHooks.push(syncPickers);          // 画面を開くたびに、選択欄の表示を中身に合わせる
+if (!overlayOpenHooks.includes(syncPickers)) overlayOpenHooks.push(syncPickers);   // 画面を開くたびに表示を合わせる（登録は1回だけ）
 syncPickers();
