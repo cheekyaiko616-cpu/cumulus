@@ -11,9 +11,18 @@ input[type="date"] { -webkit-appearance: none; appearance: none; display: block;
 input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 @media (max-width: 370px) { .two { grid-template-columns: minmax(0, 1fr); } }
-.rows { display: flex; flex-direction: column; gap: 6px; }
-.row { display: grid; grid-template-columns: minmax(0, 1fr) 7.4em 44px; gap: 6px; align-items: center; }
-.row input.p { text-align: right; font-family: var(--num); }
+/* 長い文字も全文見えるよう、折り返して高さが伸びる入力欄（textarea.ag）。iPhoneの自動拡大を避けるため文字は16pxのまま */
+textarea.ag { display: block; resize: none; overflow: hidden; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-s); min-height: 46px; padding: 9px 12px; font: var(--fs-l)/1.4 var(--jp); width: 100%; min-width: 0; color: var(--text); overflow-wrap: anywhere; word-break: break-all; }
+.one { grid-template-columns: minmax(0, 1fr); }
+.rows { display: flex; flex-direction: column; gap: 8px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) 44px; grid-template-areas: "n d" "p p"; gap: 4px 6px; align-items: start; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.row .n { grid-area: n; }
+/* 金額欄：左詰め。¥を欄の左に固定し、数字は¥の右から。幅は8桁が切れない最小限 */
+.row .pw { grid-area: p; justify-self: start; position: relative; width: min(100%, 8.5em); }
+.row .pw::before { content: "¥"; position: absolute; left: 12px; top: 0; bottom: 0; display: flex; align-items: center; color: var(--muted); font-family: var(--num); pointer-events: none; }
+.row input.p { padding-left: 28px; text-align: left; font-family: var(--num); }
+.row .del { grid-area: d; }
+@media (min-width: 560px) { .row { grid-template-columns: minmax(0, 1fr) 8.5em 44px; grid-template-areas: "n p d"; border-bottom: 0; padding-bottom: 0; } .row .pw { width: 100%; } }
 .del { border: 0; background: transparent; color: var(--danger); font-weight: 700; min-height: 46px; width: 44px; padding: 0; border-radius: var(--r-s); }
 .total { display: flex; justify-content: space-between; align-items: baseline; border-top: 2px solid var(--text); padding-top: 8px; font-weight: 700; }
 .total .num { font-size: 26px; }

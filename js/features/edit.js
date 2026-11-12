@@ -5,16 +5,47 @@
 // 実行時: day.js
 // 公開: editing, editPay, matchMode, rowHtml, readRows, updateTotal, setPay, updateCardHint, findMailMatch, updateMatch, openEdit
 
+// ---- 折り返して高さが伸びる入力欄（textarea.ag）：全文を見せる。改行は入れさせない ----
+function autoGrow(el) {
+  if (!el.offsetWidth) return;                       // 隠れている間は測れない（開いたときに ResizeObserver が呼ぶ）
+  el.style.height = "auto"; el.style.height = el.scrollHeight + 2 + "px";   // 枠線の分
+}
+function growAll(root) { root.querySelectorAll("textarea.ag").forEach(autoGrow); }
+// 入力中の欄がキーボードや下のボタンに隠れないよう、見える範囲に収める（イベントのときだけ動く）
+function reveal(el) {
+  const sheet = el.closest(".sheet"); if (!sheet) return;
+  const foot = sheet.querySelector(".sheet-foot"), vv = window.visualViewport;
+  const sr = sheet.getBoundingClientRect(), r = el.getBoundingClientRect();
+  let bottom = Math.min(sr.bottom, vv ? vv.offsetTop + vv.height : innerHeight);
+  if (foot && foot.getBoundingClientRect().top < bottom) bottom = foot.getBoundingClientRect().top;
+  if (r.bottom > bottom - 8) sheet.scrollTop += r.bottom - bottom + 8;
+  else if (r.top < sr.top + 8) sheet.scrollTop -= sr.top + 8 - r.top;
+}
+document.addEventListener("input", (e) => {
+  const el = e.target; if (!el.matches || !el.matches("textarea.ag")) return;
+  if (el.value.includes("\n")) el.value = el.value.replace(/\s*[\r\n]+\s*/g, " ");   // 貼り付けの改行は空白にする
+  autoGrow(el); reveal(el);
+});
+document.addEventListener("focusin", (e) => { const el = e.target; if (el.matches && el.matches("textarea.ag, input, select")) reveal(el); });
+document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches && e.target.matches("textarea.ag") && !e.defaultPrevented) { e.preventDefault(); e.target.blur(); } });
+if (window.visualViewport) visualViewport.addEventListener("resize", () => { const a = document.activeElement; if (a && a.closest && a.closest(".sheet")) reveal(a); });
+if (window.ResizeObserver) {                          // 画面を開いたとき（幅0から実寸になる）・向きや幅が変わったときだけ高さを合わせる。開く処理のフックは増やさない
+  const widths = new WeakMap();
+  const ro = new ResizeObserver((list) => list.forEach((x) => { const w = Math.round(x.contentRect.width); if (!w) widths.delete(x.target); else if (widths.get(x.target) !== w) { widths.set(x.target, w); growAll(x.target); } }));
+  document.querySelectorAll(".sheet").forEach((s) => ro.observe(s));
+}
+new MutationObserver((list) => list.forEach((m) => m.addedNodes.forEach((n) => { if (n.nodeType === 1) growAll(n); }))).observe($("itemRows"), { childList: true });
+
 let editing = null, editPay = "cash", matchMode = "same";
 function rowHtml(n, p) {
-  return '<div class="row"><input type="text" class="n" placeholder="品目" aria-label="品目" autocomplete="off" enterkeyhint="next" value="' + esc(n || "") + '">' +
-    '<input type="text" class="p" inputmode="numeric" placeholder="金額" aria-label="金額（円）" autocomplete="off" enterkeyhint="next" value="' + (p === 0 || p ? p : "") + '">' +
+  return '<div class="row"><textarea class="n ag" rows="1" placeholder="品目" aria-label="品目" autocomplete="off" enterkeyhint="next">' + esc(n || "") + '</textarea>' +
+    '<span class="pw"><input type="text" class="p" inputmode="numeric" placeholder="金額" aria-label="金額（円）" autocomplete="off" enterkeyhint="next" value="' + (p === 0 || p ? p : "") + '"></span>' +
     '<button type="button" class="del" aria-label="この品目を消す">✕</button></div>';
 }
 function readRows() {
   return [...$("itemRows").children].map((r) => ({ n: r.querySelector(".n").value.trim(), p: Math.max(-MAX_PRICE, Math.min(MAX_PRICE, toInt(r.querySelector(".p").value))) })).filter((i) => i.n || i.p);
 }
-function updateTotal() { $("eTotal").textContent = yen(readRows().reduce((a, i) => a + i.p, 0)); updateMatch(); }
+function updateTotal() { autoGrow($("eStore")); $("eTotal").textContent = yen(readRows().reduce((a, i) => a + i.p, 0)); updateMatch(); }
 function setPay(p) {
   editPay = p;
   setSeg($("paySeg"), (b) => b.dataset.pay === p);
