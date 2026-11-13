@@ -5,45 +5,45 @@
 @keyframes up { from { transform: translateY(40px); opacity: .4; } }
 .sheet-head { display: flex; align-items: center; gap: 8px; }
 .sheet-head h2 { flex: 1; margin: 0; font-size: var(--fs-l); text-align: center; }
-label.f { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-m); color: var(--muted); font-weight: 700; min-width: 0; }
-input[type="text"], input[type="date"], select { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-s); min-height: 46px; padding: 8px 12px; font-size: var(--fs-l); line-height: 1.4; width: 100%; min-width: 0; color: var(--text); }
+label.f { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-m); color: var(--muted); font-weight: var(--fw-bold); min-width: 0; }
+input[type="text"], input[type="date"], select { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-s); min-height: 46px; padding: 8px 12px; font-size: var(--fs-l); line-height: var(--lh-ui); width: 100%; min-width: 0; color: var(--text); }
 input[type="date"] { -webkit-appearance: none; appearance: none; display: block; text-align: left; }
 input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 @media (max-width: 370px) { .two { grid-template-columns: minmax(0, 1fr); } }
 /* 長い文字も全文見えるよう、折り返して高さが伸びる入力欄（textarea.ag）。iPhoneの自動拡大を避けるため文字は16pxのまま */
-textarea.ag { display: block; resize: none; overflow: hidden; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-s); min-height: 46px; padding: 9px 12px; font: var(--fs-l)/1.4 var(--jp); width: 100%; min-width: 0; color: var(--text); overflow-wrap: anywhere; word-break: break-all; }
+textarea.ag { display: block; resize: none; overflow: hidden; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-s); min-height: 46px; padding: 9px 12px; font-size: var(--fs-l); line-height: var(--lh-ui); width: 100%; min-width: 0; color: var(--text); overflow-wrap: anywhere; word-break: break-all; }
 .one { grid-template-columns: minmax(0, 1fr); }
 .rows { display: flex; flex-direction: column; gap: 8px; }
 .row { display: grid; grid-template-columns: minmax(0, 1fr) 44px; grid-template-areas: "n d" "p p"; gap: 4px 6px; align-items: start; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 .row .n { grid-area: n; }
 /* 金額欄：左詰め。¥を欄の左に固定し、数字は¥の右から。幅は8桁が切れない最小限 */
 .row .pw { grid-area: p; justify-self: start; position: relative; width: min(100%, 8.5em); }
-.row .pw::before { content: "¥"; position: absolute; left: 12px; top: 0; bottom: 0; display: flex; align-items: center; color: var(--muted); font-family: var(--num); pointer-events: none; }
-.row input.p { padding-left: 28px; text-align: left; font-family: var(--num); }
+.row .pw::before { content: "¥"; position: absolute; left: 12px; top: 0; bottom: 0; display: flex; align-items: center; color: var(--muted); pointer-events: none; }
+.row input.p { padding-left: 28px; text-align: left; }
 .row .del { grid-area: d; }
 @media (min-width: 560px) { .row { grid-template-columns: minmax(0, 1fr) 8.5em 44px; grid-template-areas: "n p d"; border-bottom: 0; padding-bottom: 0; } .row .pw { width: 100%; } }
-.del { border: 0; background: transparent; color: var(--danger); font-weight: 700; min-height: 46px; width: 44px; padding: 0; border-radius: var(--r-s); }
-.total { display: flex; justify-content: space-between; align-items: baseline; border-top: 2px solid var(--text); padding-top: 8px; font-weight: 700; }
-.total .num { font-size: 26px; }
-.primary { background: var(--accent); color: var(--on-accent); border: 0; border-radius: var(--r-m); min-height: 48px; padding: 10px; font-weight: 700; font-size: var(--fs-l); width: 100%; }
-.dashed { background: transparent; border: 2px dashed var(--border); border-radius: var(--r-m); min-height: 46px; padding: 8px; font-weight: 700; color: var(--accent); width: 100%; }
-.danger-b { background: transparent; border: 1px solid var(--danger); color: var(--danger); border-radius: var(--r-m); min-height: var(--tap); padding: 9px 12px; font-weight: 700; }
+.del { border: 0; background: transparent; color: var(--danger); font-weight: var(--fw-bold); min-height: 46px; width: 44px; padding: 0; border-radius: var(--r-s); }
+.total { display: flex; justify-content: space-between; align-items: baseline; border-top: 2px solid var(--text); padding-top: 8px; font-weight: var(--fw-bold); }
+.total .num { font-size: var(--fs-2xl); }
+.primary { background: var(--accent); color: var(--on-accent); border: 0; border-radius: var(--r-m); min-height: 48px; padding: 10px; font-weight: var(--fw-bold); font-size: var(--fs-l); width: 100%; }
+.dashed { background: transparent; border: 2px dashed var(--border); border-radius: var(--r-m); min-height: 46px; padding: 8px; font-weight: var(--fw-bold); color: var(--accent); width: 100%; }
+.danger-b { background: transparent; border: 1px solid var(--danger); color: var(--danger); border-radius: var(--r-m); min-height: var(--tap); padding: 9px 12px; font-weight: var(--fw-bold); }
 .status { font-size: var(--fs-m); color: var(--muted); margin: 0; }
 .status:empty { display: none; }
-.toast { position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 30; background: var(--text); color: var(--bg); border-radius: var(--r-m); padding: 8px 16px; font-size: var(--fs-m); font-weight: 700; max-width: calc(100% - 32px); }
+.toast { position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 30; background: var(--text); color: var(--bg); border-radius: var(--r-m); padding: 8px 16px; font-size: var(--fs-m); font-weight: var(--fw-bold); max-width: calc(100% - 32px); }
 .sheet.has-foot { padding-bottom: 0; }
 .sheet-foot { position: sticky; bottom: 0; margin-top: auto; background: var(--surface); border-top: 1px solid var(--border); padding: 10px 0 calc(14px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 10px; }
 .sheet-foot .total { border-top: 0; padding-top: 0; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
 .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--border); align-self: center; flex-shrink: 0; margin-top: -6px; }
 .foot-btns { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 10px; }
-.cancel { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-m); min-height: 48px; padding: 10px; font-weight: 700; font-size: var(--fs-l); width: 100%; }
+.cancel { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-m); min-height: 48px; padding: 10px; font-weight: var(--fw-bold); font-size: var(--fs-l); width: 100%; }
 /* 選択欄：ふつうのプルダウンの代わり */
 select[data-pick] { display: none; }
-.selbtn { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; min-height: 46px; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-s); font-size: var(--fs-l); font-weight: 400; color: var(--text); text-align: left; }
+.selbtn { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; min-height: 46px; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-s); font-size: var(--fs-l); font-weight: var(--fw-regular); color: var(--text); text-align: left; }
 .selbtn i { font-style: normal; color: var(--muted); font-size: var(--fs-s); }
 .optlist { position: relative; display: flex; flex-direction: column; max-height: 52vh; overflow-y: auto; overscroll-behavior: contain; }
 .opt { display: flex; justify-content: space-between; align-items: center; min-height: 50px; padding: 0 6px; background: none; border: 0; border-top: 1px solid var(--border); font-size: var(--fs-l); text-align: left; color: var(--text); }
 .opt:first-child { border-top: 0; }
-.opt.on { color: var(--accent); font-weight: 700; }
+.opt.on { color: var(--accent); font-weight: var(--fw-bold); }

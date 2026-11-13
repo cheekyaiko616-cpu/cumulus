@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#174f42">
 <title>Cumulus</title>
 <meta name="application-name" content="Cumulus">
@@ -12,7 +12,6 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&display=swap">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/calendar.css">
 <link rel="stylesheet" href="css/components.css">
@@ -59,8 +58,18 @@
   </section>
 
   <section class="view" id="view-invest" hidden>
-    <div class="seg" id="invSeg"><button type="button" data-m="month">月</button><button type="button" data-m="all">全期間</button><button type="button" data-m="custom">期間指定</button></div>
-    <div class="nav" id="invNav"><button class="sec" id="invPrev" type="button" aria-label="前の月">‹</button><div class="t" id="invLabel"></div><button class="sec" id="invNext" type="button" aria-label="次の月">›</button></div>
+    <div class="pin">
+      <div class="pin-ctl">
+        <div class="seg" id="invSeg"><button type="button" data-m="month">月</button><button type="button" data-m="all">全期間</button><button type="button" data-m="custom">期間指定</button></div>
+        <div class="nav" id="invNav"><button class="sec" id="invPrev" type="button" aria-label="前の月">‹</button><div class="t" id="invLabel"></div><button class="sec" id="invNext" type="button" aria-label="次の月">›</button></div>
+      </div>
+      <div class="pin-fig">
+        <div class="hero-inv">
+          <div class="lab">貯まった投資資金</div><div class="val" id="invHero"></div>
+          <div class="hero-rows"><div><span>投資した金額</span><b class="num" id="invDone"></b></div><div><span>未投資の残り</span><b class="num" id="invLeft"></b></div></div>
+        </div>
+      </div>
+    </div>
     <div class="card" id="invCustom" hidden>
       <div class="two">
         <label class="f">開始日<input type="date" id="ivFrom" min="2000-01-01"></label>
@@ -68,18 +77,24 @@
       </div>
     </div>
     <div class="span-line" id="invSpan"></div>
-    <div class="hero-inv">
-      <div class="lab">貯まった投資資金</div><div class="val" id="invHero"></div>
-      <div class="hero-rows"><div><span>投資した金額</span><b class="num" id="invDone"></b></div><div><span>未投資の残り</span><b class="num" id="invLeft"></b></div></div>
-    </div>
     <button class="primary" id="invAdd" type="button">＋ 投資を記録</button>
     <div class="card"><h2>投資の記録</h2><div id="invList"></div></div>
     <div class="card"><h2>月ごとの投資資金</h2><div id="monthList"></div></div>
   </section>
 
   <section class="view" id="view-summary" hidden>
-    <div class="seg" id="periodSeg"><button type="button" data-p="week">週</button><button type="button" data-p="month">月</button><button type="button" data-p="year">年</button><button type="button" data-p="custom">期間指定</button></div>
-    <div class="nav" id="navRow"><button class="sec" id="prevP" type="button" aria-label="前の期間">‹</button><div class="t" id="periodLabel"></div><button class="sec" id="nextP" type="button" aria-label="次の期間">›</button></div>
+    <div class="pin">
+      <div class="pin-ctl">
+        <div class="seg" id="periodSeg"><button type="button" data-p="week">週</button><button type="button" data-p="month">月</button><button type="button" data-p="year">年</button><button type="button" data-p="custom">期間指定</button></div>
+        <div class="nav" id="navRow"><button class="sec" id="prevP" type="button" aria-label="前の期間">‹</button><div class="t" id="periodLabel"></div><button class="sec" id="nextP" type="button" aria-label="次の期間">›</button></div>
+      </div>
+      <div class="pin-fig">
+        <div class="figs">
+          <div class="fig"><div class="lab">使った金額</div><div class="val" id="pSpent"></div></div>
+          <div class="fig invest"><div class="lab">貯まった投資資金</div><div class="val" id="pInvest"></div></div>
+        </div>
+      </div>
+    </div>
     <div class="card" id="customBox" hidden>
       <div class="two">
         <label class="f">開始日<input type="date" id="cFrom" min="2000-01-01"></label>
@@ -88,10 +103,6 @@
       <div class="chips" id="presetChips"><button type="button" data-preset="month">今月</button><button type="button" data-preset="last">先月</button><button type="button" data-preset="d30">直近30日</button><button type="button" data-preset="year">今年</button></div>
     </div>
     <div class="span-line" id="periodSpan"></div>
-    <div class="figs">
-      <div class="fig"><div class="lab">使った金額</div><div class="val" id="pSpent"></div></div>
-      <div class="fig invest"><div class="lab">貯まった投資資金</div><div class="val" id="pInvest"></div></div>
-    </div>
     <div class="card"><h2>支払い方法ごと</h2><div id="payBars"></div><div id="payDeb"></div></div>
     <div class="card"><h2>この期間の記録</h2><div id="periodList"></div></div>
   </section>
@@ -111,8 +122,14 @@
     </div>
     <h2 class="grp">データ</h2>
     <div class="card menu-card">
+      <button class="menu-row" id="bkSave" type="button"><span>バックアップを保存</span><span class="menu-r" id="bkLast"></span></button>
+      <button class="menu-row" id="bkLoad" type="button">バックアップから復元</button>
+      <button class="menu-row" id="bkUndo" type="button" hidden>直前の復元を元に戻す</button>
       <button class="menu-row danger" id="wipeBtn" type="button">すべての記録を消す</button>
     </div>
+    <p class="hint grp-note">バックアップに、メール連携のURLと合言葉は含まれません。復元後に設定し直してください。</p>
+    <p class="status" id="bkMsg" role="status"></p>
+    <input type="file" id="bkFile" accept=".json,application/json" hidden>
     <p class="about">Cumulus</p>
   </section>
 </div></main>
@@ -131,6 +148,14 @@
   <label class="f">1日あたりの金額（円）<input type="text" id="setDaily" inputmode="numeric" autocomplete="off"></label>
   <label class="f">数え始める日<input type="date" id="setStart" min="2000-01-01"></label>
   <button class="cancel" data-close="ruleOverlay" type="button">閉じる</button>
+</div></div>
+
+<!-- 支払い方法ごとの明細 -->
+<div class="overlay" id="payOverlay" data-backdrop hidden><div class="sheet gutter" role="dialog" aria-modal="true" aria-labelledby="payTitle">
+  <div class="sheet-head"><h2 id="payTitle" style="text-align:left"></h2></div>
+  <div class="paysum" id="paySum"></div>
+  <div id="payBody"></div>
+  <button class="cancel" data-close="payOverlay" type="button">閉じる</button>
 </div></div>
 
 <!-- 日ごとの記録 -->
@@ -207,7 +232,7 @@
 </div></div>
 
 <!-- メールから自動取り込み -->
-<div class="overlay" id="mailOverlay" hidden><div class="sheet has-foot gutter" id="mailSheet" role="dialog" aria-modal="true" aria-labelledby="mailTitle">
+<div class="overlay" id="mailOverlay" hidden><div class="sheet has-foot gutter" role="dialog" aria-modal="true" aria-labelledby="mailTitle">
   <div class="sheet-head"><h2 id="mailTitle" style="text-align:left">メールから自動取り込み</h2></div>
   <div class="note" id="mailState"></div>
   <button class="dashed" id="mailGuideBtn" type="button">連携の準備（初回だけ）</button>
@@ -221,7 +246,7 @@
 </div></div>
 
 <!-- 連携の準備 -->
-<div class="overlay" id="mailGuideOverlay" hidden><div class="sheet has-foot gutter" id="mailGuideSheet" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+<div class="overlay" id="mailGuideOverlay" hidden><div class="sheet has-foot gutter" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
   <div class="sheet-head"><h2 id="guideTitle" style="text-align:left">連携の準備</h2></div>
   <ol class="steps">
     <li>「スクリプトをコピー」を押す。</li>
@@ -237,7 +262,7 @@
 </div></div>
 
 <!-- 取り込む内容の確認 -->
-<div class="overlay" id="mailPrevOverlay" hidden><div class="sheet has-foot gutter" id="mailPrevSheet" role="dialog" aria-modal="true" aria-labelledby="prevTitle">
+<div class="overlay" id="mailPrevOverlay" hidden><div class="sheet has-foot gutter" role="dialog" aria-modal="true" aria-labelledby="prevTitle">
   <div class="sheet-head"><h2 id="prevTitle" style="text-align:left">取り込む内容の確認</h2></div>
   <div id="mailPrevBody"></div>
   <div class="sheet-foot"><div class="foot-btns"><button class="cancel" data-close="mailPrevOverlay" type="button">キャンセル</button><button class="primary" id="mpOk" type="button">記録する</button></div></div>
@@ -251,7 +276,7 @@
 </div></div>
 
 <!-- 選択（プルダウンの代わり） -->
-<div class="overlay" id="selOverlay" hidden><div class="sheet gutter" id="selSheet" role="dialog" aria-modal="true" aria-labelledby="selTitle">
+<div class="overlay" id="selOverlay" hidden><div class="sheet gutter" role="dialog" aria-modal="true" aria-labelledby="selTitle">
   <div class="sheet-head"><h2 id="selTitle" style="text-align:left"></h2></div>
   <div class="optlist" id="selList" role="listbox"></div>
   <button class="cancel" data-close="selOverlay" type="button">キャンセル</button>
@@ -266,6 +291,7 @@
 <script src="js/core/sample.js"></script>
 <script src="js/core/billing.js"></script>
 <script src="js/core/stats.js"></script>
+<script src="js/core/backup-file.js"></script>
 <script src="js/core/period.js"></script>
 <script src="js/core/mail-plan.js"></script>
 <script src="js/core/receipt-image.js"></script>
@@ -286,6 +312,7 @@
 <script src="js/features/invest.js"></script>
 <script src="js/features/summary.js"></script>
 <script src="js/features/settings.js"></script>
+<script src="js/features/backup.js"></script>
 <script src="js/features/cards.js"></script>
 <script src="js/features/mail.js"></script>
 <script src="js/main.js"></script>

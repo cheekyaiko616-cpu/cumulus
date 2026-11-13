@@ -16,7 +16,7 @@
   9. CSS で使っている変数（--xxx）が、定義されている
  10. 絵文字を使っていない（index.html・js/・css/・tools/apps-script/Code.gs。SVGのイラストを使う）
 調べること（注意だけ）
-  - 使われていない class（CSS）／使われていない関数・定数（JS）／書いたのに使っていない依存
+  - 使われていない class（CSS）／使われていない関数・定数（JS）／書いたのに使っていない依存／文字の大きさのpx直書き（CSS）／使われていない id（HTML）
 """
 import re, sys, pathlib
 
@@ -276,6 +276,15 @@ def main():
             if sel in seen: dups.append((f, sel))
             seen[sel] = 1
     for f, sel in dups: warns.append(f"{f}: 選択子「{sel}」が2回書かれています（まとめられます）")
+
+    # 文字の大きさは、css/base.css の --fs-* だけで決める（px の直書きを見つける）。使われていない id（index.html）も見つける
+    for f in css_files:
+        for n, line in enumerate(css_text[f].splitlines(), 1):
+            if re.search(r"font-size:\s*[\d.]+(px|em|rem)|\bfont:[^;}]*[\d.]+px", line) and not re.search(r"--fs-[\w]+\s*:", line): warns.append(f"{f}: 文字の大きさを直接書いています（--fs-* を使う）: {line.strip()[:60]}")
+    all_js = "\n".join(info[f]["raw"] for f in on_disk if f not in SKIP_FILES)
+    for i in sorted(set(re.findall(r'\bid="([^"]+)"', index))):
+        if i.startswith("view-") or i.startswith("i-") or i.startswith("mCard"): continue                       # view-◯◯ は "view-" + 名前 で、i-◯◯ は <use href="#…"> で、mCard◯◯ は "mCard" + 発行元 で使う
+        if not re.search(r"[\"'#]" + re.escape(i) + r"\b", all_js + all_css) and ("#" + i) not in index and f'aria-labelledby="{i}"' not in index: warns.append(f"index.html: id「{i}」は、JS にも CSS にも出てきません（不要なら消してください）")
 
     emoji_files = ["index.html", "tools/apps-script/Code.gs"] + sorted(str(q.relative_to(ROOT)) for d in ("js", "css") for q in (ROOT / d).rglob("*") if q.suffix in (".js", ".css"))
     for f in emoji_files:                         # 絵文字（自動で作る gas-source.js は Code.gs の写しなので対象外）

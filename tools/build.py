@@ -16,12 +16,11 @@ js = "\n".join(re.sub(r'^"use strict";\n', "", read(j)) for j in js_files)
 body = re.search(r"<body>(.*)</body>", src, re.S).group(1)
 body = re.sub(r'<script src="[^"]+"></script>\n?', "", body).strip()
 title = re.search(r"<title>.*?</title>", src).group(0)
-font = re.search(r'<link rel="stylesheet" href="https://fonts[^>]*>', src).group(0)
 assert "</script" not in js
 if fragment:
-    page = f'{title}\n<meta name="claude:viewport-fit-sides" content="cover">\n{font}\n<style>\n{css}\n</style>\n\n{body}\n\n<script>\n"use strict";\n{js}\n</script>\n'
+    page = f'{title}\n<meta name="claude:viewport-fit-sides" content="cover">\n<style>\n{css}\n</style>\n\n{body}\n\n<script>\n"use strict";\n{js}\n</script>\n'
 else:
-    page = f'<!doctype html>\n<html lang="ja">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n{title}\n{font}\n<style>\n{css}\n</style>\n</head>\n<body>\n{body}\n<script>\n"use strict";\n{js}\n</script>\n</body>\n</html>\n'
+    page = f'<!doctype html>\n<html lang="ja">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">\n{title}\n<style>\n{css}\n</style>\n</head>\n<body>\n{body}\n<script>\n"use strict";\n{js}\n</script>\n</body>\n</html>\n'
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(page, encoding="utf8")
 print("書き出しました:", out, f"({len(page):,} 文字)")

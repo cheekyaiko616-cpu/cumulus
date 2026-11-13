@@ -3,7 +3,7 @@
 // 役割: 複数の画面で使う、一覧の行の見た目（買い物の行・金額つきの行・「ありません」の表示）
 // 依存: util.js, model.js
 // 実行時: なし
-// 公開: payColor, emptyHtml, debRow, entryHtml
+// 公開: emptyHtml, debRow, entryHtml
 
 const payColor = (e) => "var(--" + e.pay + ")";                    // 支払い方法ごとの色（css/base.css の --cash・--code・--credit）
 const emptyHtml = (text) => '<div class="empty">' + text + "</div>";

@@ -3,8 +3,9 @@
 // 役割: 締め日と引き落とし日から、いつ・いくら引き落とされるかを求める（カード設定の形は model.js）
 // 依存: util.js, model.js
 // 実行時: なし
-// 公開: cardOf, cycleEnd, cycleStart, payDateOf, cardRuleText, pays, paysByDate, buildPayments, paysIn
+// 公開: NO_CARD, cardOf, cycleEnd, cycleStart, payDateOf, cardRuleText, pays, paysByDate, buildPayments, paysIn
 
+const NO_CARD = "カード未選択";                  // カードを選ばなかったクレジットの記録の呼び名（引き落とし・内訳で共通）
 const cardOf = (name) => state.cards.find((c) => c.name === name) || makeCard(name);
 // y年m月（mは0始まり。12以上や負の値は自動で年を繰り上げ・繰り下げ）のd日。d=0は月末
 function dayOf(y, m, d) {
@@ -33,7 +34,7 @@ function buildPayments() {
   const groups = {};
   state.entries.forEach((e) => {
     if (e.pay !== "credit") return;
-    const name = e.card || "カード未選択", c = cardOf(e.card), end = cycleEnd(e.date, c.close), date = payDateOf(end, c), k = date + "|" + name;
+    const name = e.card || NO_CARD, c = cardOf(e.card), end = cycleEnd(e.date, c.close), date = payDateOf(end, c), k = date + "|" + name;
     const g = groups[k] || (groups[k] = { date, card: name, amount: 0, from: cycleStart(end, c.close), to: end });
     g.amount += e.total;
   });

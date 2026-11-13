@@ -9,10 +9,13 @@
   --cash: #1d6352; --code: #2b78a8; --credit: #7a5aa6;
   --ill-line: #174f42; --ill-pig: #f3aaa3; --ill-coin: #d9a520; --ill-green: #1d6352; --ill-mint: #dcebe5;   /* イラスト（使わなかった日・カード・投資）の色 */
   --r-s: 10px; --r-m: 14px; --r-l: 18px;   /* 角丸：入力欄・小さな部品／ボタン・切り替え／カード・重ねて開く画面 */
-  --fs-s: 12px; --fs-m: 14px; --fs-l: 16px;   /* 文字の大きさ：補足／本文／入力・見出し */
+  /* 文字の決まり（ここだけで決める）。大きさ：極小の補足／補足・ラベル／本文／入力・見出し・強調／小さめの金額・矢印／大きな金額／特大の金額 */
+  --fs-xs: 11px; --fs-s: 12px; --fs-m: 14px; --fs-l: 16px; --fs-xl: 20px; --fs-2xl: 28px; --fs-3xl: 36px;
+  --fw-regular: 400; --fw-medium: 600; --fw-bold: 700;   /* 太さ：本文／項目名・見出し／強調・金額・ボタン */
+  --lh: 1.6; --lh-ui: 1.4; --lh-num: 1.15;   /* 行の高さ：文章／ボタン・入力欄・一覧／金額・カレンダーのマス */
+  --ls-wide: .16em;   /* 字間を広げるのは、アプリ名だけ */
+  --font: system-ui, -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", "Meiryo UI", sans-serif;   /* 書体は端末のものを1つだけ（Webフォントは読み込まない） */
   --tap: 44px;   /* 押せる場所の最小の高さ */
-  --num: "Barlow Semi Condensed", "Hiragino Sans", "Yu Gothic", sans-serif;
-  --jp: "Hiragino Sans", "Yu Gothic", "Meiryo", system-ui, sans-serif;
   padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);   /* 画面の上下の安全な余白（ノッチ・ホームバー） */
 }
 @media (prefers-color-scheme: dark) {
@@ -38,14 +41,16 @@
   color-scheme: dark;
 }
 /* ===== 全体の土台 ===== */
-* { box-sizing: border-box; }
+/* 拡大は使わない：ピンチ・ダブルタップの拡大を止める（index.html の viewport と、main.js の gesturestart も同じ目的） */
+* { box-sizing: border-box; touch-action: pan-x pan-y; }
 html, body { height: 100%; }
-body { margin: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--jp); font-size: var(--fs-m); line-height: 1.6; }
+body { margin: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font); font-size: var(--fs-m); font-weight: var(--fw-regular); line-height: var(--lh); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 [hidden] { display: none !important; }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; letter-spacing: inherit; color: inherit; }   /* 部品の文字も、ブラウザ既定ではなく、ここで決めた書体にそろえる */
 button { cursor: pointer; }
 :focus-visible { outline: 3px solid var(--gold-coin); outline-offset: 2px; }
-.num { font-family: var(--num); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+/* 金額・日付の数字は、桁がそろう等幅数字 */
+.num, .item .r, .fig .val, .hero-inv .val, .hero-rows b, .cell .amt, .row input.p, .row .pw::before { font-variant-numeric: tabular-nums; }
 .gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 .col { max-width: 520px; margin: 0 auto; }
 
@@ -53,31 +58,38 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 header { flex-shrink: 0; z-index: 5; background: var(--band); color: #fff; padding-block: 6px 8px; }
 header .col { display: flex; flex-direction: column; gap: 2px; }
 /* 上の段：アプリ名（すべての画面で表示） */
-.brand { font: 700 11px/1.2 var(--num); letter-spacing: .18em; opacity: .82; }
+.brand { font-size: var(--fs-xs); font-weight: var(--fw-bold); line-height: var(--lh-num); letter-spacing: var(--ls-wide); opacity: .82; }
 /* 下の段：画面ごとの操作 */
 .hrow { display: flex; align-items: center; gap: 8px; min-height: var(--tap); }
-.hbtn { width: var(--tap); height: var(--tap); border: 0; border-radius: var(--r-m); background: rgba(255,255,255,.16); color: #fff; font-size: 24px; line-height: 1; font-weight: 700; flex-shrink: 0; }
+.hbtn { width: var(--tap); height: var(--tap); border: 0; border-radius: var(--r-m); background: rgba(255,255,255,.16); color: #fff; font-size: var(--fs-xl); line-height: 1; font-weight: var(--fw-bold); flex-shrink: 0; }
 .sp { margin-left: auto; }
 .pill .caret { font-size: var(--fs-s); margin-left: 6px; }
-.pill { background: #fff; color: #174f42; border: 0; border-radius: var(--r-m); padding: 5px 12px; min-height: var(--tap); font-weight: 700; font-size: var(--fs-l); }
-.ghost { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.8); border-radius: var(--r-m); padding: 3px 12px; min-height: var(--tap); font-weight: 700; font-size: var(--fs-m); }
-header h1 { margin: 0 auto 0 0; font-size: var(--fs-l); font-weight: 600; letter-spacing: .04em; }
+.pill { background: #fff; color: #174f42; border: 0; border-radius: var(--r-m); padding: 5px 12px; min-height: var(--tap); font-weight: var(--fw-bold); font-size: var(--fs-l); }
+.ghost { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.8); border-radius: var(--r-m); padding: 3px 12px; min-height: var(--tap); font-weight: var(--fw-bold); font-size: var(--fs-m); }
+header h1 { margin: 0 auto 0 0; font-size: var(--fs-l); font-weight: var(--fw-medium); }
 
-main { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-block: 12px 16px; }
-main .col { display: flex; flex-direction: column; gap: 12px; }
+main { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-block: 0 16px; }
+main .col { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
 /* カレンダー画面は1画面に収め、スクロールさせない */
 main.fit { overflow: hidden; }
 main.fit .col { height: 100%; }
 main.fit #view-calendar { flex: 1 1 auto; min-height: 0; }
 .view[hidden] { display: none; }
 .view { display: flex; flex-direction: column; gap: 12px; }
+/* 固定する部分（まとめ・投資）：期間の切り替えと、上の数字は、スクロールしても動かない。数字より下だけが動く。
+   背の低い画面（〜700px）では、数字だけを固定して、本文を広く見せる（期間の切り替えは、上に戻すと出る） */
+.pin, .pin-ctl, .pin-fig { display: flex; flex-direction: column; gap: 12px; }
+.pin { position: sticky; top: 0; z-index: 3; margin-top: -12px; padding: 12px 0 4px; background: var(--bg); }
+@media (max-height: 700px) {
+  .pin { display: contents; }
+  .pin-fig { position: sticky; top: 0; z-index: 3; margin-top: -12px; padding: 12px 0 4px; background: var(--bg); }
+}
 
 .sample { flex-shrink: 0; background: var(--gold-soft); color: var(--text); border-radius: var(--r-s); padding: 0 6px 0 12px; font-size: var(--fs-s); display: flex; gap: 8px; align-items: center; justify-content: space-between; }
-.sample button { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-s); padding: 3px 10px; min-height: var(--tap); font-size: var(--fs-s); font-weight: 700; }
+.sample button { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-s); padding: 3px 10px; min-height: var(--tap); font-size: var(--fs-s); font-weight: var(--fw-bold); }
 /* 幅の狭い画面（〜350px）でも、ヘッダーを1行に収める */
 @media (max-width: 350px) {
   .hrow { gap: 6px; flex-wrap: nowrap; }
-  .hbtn { width: var(--tap); height: var(--tap); font-size: 22px; }
   .pill { padding: 4px 9px; font-size: var(--fs-m); white-space: nowrap; }
   .pill .caret { margin-left: 4px; }
   .ghost { padding: 2px 9px; font-size: var(--fs-m); }

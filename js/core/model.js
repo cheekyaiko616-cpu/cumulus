@@ -3,7 +3,7 @@
 // 役割: 保存するデータの形・上限・初期値・読み込み時の点検（normalize）を、ここに集める。データの形を変えるときは、ここだけを直す
 // 依存: util.js
 // 実行時: なし
-// 公開: state, STATE_VERSION, MAX_PRICE, MAX_INV, MIN_DATE, MAX_DAILY, MAX_CARDS, MAX_SEEN, MAX_MEMO, DEFAULT_DAILY, payLabel, makeCard, normMail, normalize, freshState
+// 公開: state, STATE_VERSION, MAX_PRICE, MAX_INV, MIN_DATE, MAX_DAILY, MAX_CARDS, MAX_SEEN, MAX_MEMO, DEFAULT_DAILY, PAY, payLabel, makeCard, normMail, normalize, freshState
 
 let state;                                  // 現在のデータ（唯一の正）。形は normalize() が決める
 
