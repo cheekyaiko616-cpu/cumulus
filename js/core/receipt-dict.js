@@ -6,7 +6,7 @@
 //       履歴は読み取りの開始時に1回だけ作る（常駐・タイマーなし）。写真・文字は外へ送らず、保存もしない。新しい保存項目は増やさない
 // 依存: なし
 // 実行時: なし
-// 公開: rcBuildDict, rcFixName, rcFixStore, rcFixDiscount
+// 公開: rcBuildDict, rcFixName, rcFixStore, rcFixDiscount, RC_BRAND_TEXT, RC_CITIES
 
 // ---- 似た字：同じ組は読み違えやすい（ずれ 0）、ゆるい組は 0.5、ほかは 1 ----
 const RC_SAME = ["ー-−‐―一ｰ", "ヘへ", "ロ口", "カ力", "トト卜", "ハ八", "ニ二", "エ工", "タ夕", "0O○", "1lI|", "5S", "8B"];

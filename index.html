@@ -50,7 +50,7 @@
       <div class="fig"><div class="lab" id="mSpentLab"></div><div class="val" id="mSpent"></div></div>
       <button class="fig invest" id="goInvest" type="button" aria-label="投資の画面を開く"><div class="lab" id="mInvestLab"></div><div class="val" id="mInvest"></div></button>
     </div>
-    <div class="cal" id="calWrap">
+    <div class="cal" id="calWrap" data-swipe-own>
       <div class="weekdays"><div class="sun">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div></div>
       <div class="grid" id="calGrid" style="margin-top:4px"></div>
       <div class="legend"><span><svg class="saved-ic" aria-hidden="true" focusable="false"><use href="#i-saved"/></svg>使わなかった日</span><span><svg class="card-ic" aria-hidden="true" focusable="false"><use href="#i-card"/></svg>カード引き落とし日</span></div>
@@ -103,7 +103,15 @@
       <div class="chips" id="presetChips"><button type="button" data-preset="month">今月</button><button type="button" data-preset="last">先月</button><button type="button" data-preset="d30">直近30日</button><button type="button" data-preset="year">今年</button></div>
     </div>
     <div class="span-line" id="periodSpan"></div>
-    <div class="card"><h2>支払い方法ごと</h2><div id="payBars"></div><div id="payDeb"></div></div>
+    <div class="card">
+      <div class="seg" id="viewSeg"><button type="button" data-v="pay">支払い方法別</button><button type="button" data-v="shop">お店別</button></div>
+      <div id="payBox"><div id="payBars"></div><div id="payDeb"></div></div>
+      <div id="shopBox" hidden>
+        <select id="shopScope" data-pick="対象"></select>
+        <div class="paysum" id="shopSum"></div>
+        <div id="shopBars"></div>
+      </div>
+    </div>
     <div class="card"><h2>この期間の記録</h2><div id="periodList"></div></div>
   </section>
 
@@ -151,11 +159,13 @@
 </div></div>
 
 <!-- 支払い方法ごとの明細 -->
-<div class="overlay" id="payOverlay" data-backdrop hidden><div class="sheet gutter" role="dialog" aria-modal="true" aria-labelledby="payTitle">
-  <div class="sheet-head"><h2 id="payTitle" style="text-align:left"></h2></div>
-  <div class="paysum" id="paySum"></div>
-  <div id="payBody"></div>
-  <button class="cancel" data-close="payOverlay" type="button">閉じる</button>
+<div class="overlay" id="payOverlay" data-backdrop hidden><div class="sheet split has-foot gutter" role="dialog" aria-modal="true" aria-labelledby="payTitle">
+  <div class="pay-top">
+    <div class="sheet-head"><h2 id="payTitle" style="text-align:left"></h2></div>
+    <div class="paysum" id="paySum"></div>
+  </div>
+  <div class="split-body" id="payBody"></div>
+  <div class="sheet-foot"><button class="cancel" data-close="payOverlay" type="button">閉じる</button></div>
 </div></div>
 
 <!-- 日ごとの記録 -->
@@ -303,6 +313,7 @@
 <script src="js/ui/overlay.js"></script>
 <script src="js/ui/picker.js"></script>
 <script src="js/ui/sheet-swipe.js"></script>
+<script src="js/ui/tab-swipe.js"></script>
 <script src="js/ui/rows.js"></script>
 <script src="js/ui/range-input.js"></script>
 <script src="js/features/calendar.js"></script>

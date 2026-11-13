@@ -75,3 +75,24 @@ textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); 
 .matchbox p { margin: 0; font-size: var(--fs-s); line-height: var(--lh-ui); }
 .matchbox .seg button { font-size: var(--fs-s); }
 .about { margin: 4px 0 0; color: var(--muted); font-size: var(--fs-s); letter-spacing: var(--ls-wide); text-align: center; }
+
+/* 月の帯（年・複数月の期間）：その月の明細が見えている間、上に固定した部分のすぐ下に止まり、次の月の帯に押し出される。
+   親（.mg）の中でだけ止まるので、途中の親に overflow を付けない。明細の画面は本文だけが動くので top: 0 */
+.mband { position: -webkit-sticky; position: sticky; top: var(--pin-h, 0px); z-index: 2; margin: 0; min-height: 36px; padding: 4px 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--bg); border-bottom: 1px solid var(--border); font-size: var(--fs-m); font-weight: var(--fw-bold); }
+.mband .num { white-space: nowrap; }
+.mg + .mg { margin-top: 4px; }
+#payBody .mband { top: 0; }
+/* 明細の画面：見出しと合計は動かず、明細だけが動く */
+.sheet.split { overflow: hidden; }
+.pay-top { flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
+.split-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+#view-summary { --pin-h: 150px; }   /* 目安。実際の高さは js/features/summary.js が入れる */
+/* 内訳の切り替え・お店ごと：名前と金額を上の段、横棒を下の段に（長い店名・8桁の金額でも崩れない） */
+#viewSeg { margin-bottom: 8px; }
+#shopBox { display: flex; flex-direction: column; gap: 8px; }
+.shop-row { grid-template-columns: minmax(0, 1fr) auto 12px; grid-template-areas: "nm v c" "bar bar bar"; width: 100%; min-height: var(--tap); border: 0; background: none; text-align: left; color: var(--text); gap: 2px 8px; padding: 6px 0; }
+.shop-row .nm { grid-area: nm; }
+.shop-row .nm small { display: block; color: var(--muted); font-size: var(--fs-s); }
+.shop-row b { grid-area: v; white-space: nowrap; }
+.shop-row .chev { grid-area: c; font-size: var(--fs-l); }
+.shop-row .bar { grid-area: bar; height: 10px; }

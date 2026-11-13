@@ -3,6 +3,8 @@
 .fig { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-l); padding: 10px 14px; min-width: 0; }
 .fig .lab { font-size: var(--fs-s); color: var(--muted); }
 .fig .val { font-size: var(--fs-2xl); font-weight: var(--fw-bold); line-height: var(--lh-num); }
+.fig .val.long { font-size: var(--fs-xl); }
+.fig .val.long2 { font-size: var(--fs-l); }   /* 7桁以上の金額は、見切れないよう小さく */
 .fig.invest { background: var(--gold-soft); border-color: transparent; }
 .fig.invest .val { color: var(--gold); }
 

@@ -5,7 +5,7 @@
 //       読み取り後の補正（追加の読み取りなし）：品名・店名は receipt-dict.js の履歴＋内蔵辞書で近似補正（dict 引数）、日付は1桁の読み違い・曜日で、金額は検算・税率別の対象額と税額・合計と支払いの一致で直す。確信が低ければ読んだまま
 // 依存: util.js, guard.js, receipt-dict.js
 // 実行時: なし
-// 公開: parseReceipt, mergeReceipts, receiptCard, rcScore
+// 公開: parseReceipt, mergeReceipts, receiptCard, rcScore, RC_CHAINS
 
 const RC_CJK = "\\u3040-\\u30ff\\u3400-\\u9fff";
 const RC_Z2H = (s) => s.replace(/[\u2460-\u2473]/g, (c) => String(c.charCodeAt(0) - 0x245f)).replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 65248)).replace(/[，]/g, ",").replace(/[．]/g, ".").replace(/[：]/g, ":").replace(/[／]/g, "/").replace(/[￥]/g, "¥").replace(/[＊]/g, "*").replace(/[（]/g, "(").replace(/[）]/g, ")").replace(/[＠]/g, "@").replace(/[ｘＸ×]/g, "x").replace(/[－―‐−]/g, "-");

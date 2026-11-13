@@ -1,7 +1,7 @@
 "use strict";
 // ===== 画面（タブ）の切り替え・起動 =====
 // 役割: タブの切り替え、見えている画面だけを描く仕組み、保存したあとの描き直し、日付が変わったときの更新、各画面をつなぐ操作（今日・一覧の行を押す）、起動
-// 依存: util.js, model.js, storage.js, stats.js, dom.js, calendar.js, invest.js, summary.js, settings.js, cards.js, mail.js
+// 依存: util.js, model.js, storage.js, stats.js, dom.js, tab-swipe.js, calendar.js, invest.js, summary.js, settings.js, cards.js, mail.js
 // 実行時: edit.js, backup.js
 // 公開: RENDER, tab, dirty, showTab, renderAll, lastToday, midnightTimer, refreshIfNewDay, scheduleMidnight
 
@@ -25,6 +25,8 @@ function showTab(name) {
 // 拡大しない：iPhoneのSafariは viewport の user-scalable=no を無視するので、ピンチの開始を止める（指2本のときだけ起きる出来事なので、スクロールの邪魔にならない）
 document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
 document.querySelector("nav.tabs").onclick = (e) => { const b = e.target.closest("[data-tab]"); if (b) showTab(b.dataset.tab); };
+// 左右のスワイプでとなりの画面へ（タブの並び順。カレンダーからは動かない）
+initTabSwipe(["calendar", "invest", "summary", "settings"], () => tab, showTab);
 $("goInvest").onclick = () => showTab("invest");
 
 function renderAll() {
