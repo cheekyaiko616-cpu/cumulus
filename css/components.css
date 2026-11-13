@@ -20,6 +20,7 @@
 .item:first-of-type { border-top: 0; }
 .item .l { min-width: 0; overflow-wrap: anywhere; }
 .up-ic { width: 18px; height: 18px; display: inline-block; vertical-align: -4px; margin-right: 6px; }
+.item .nm { display: block; }
 .item .l small { display: block; color: var(--muted); font-size: var(--fs-s); line-height: var(--lh-ui); }
 .item .r { font-weight: var(--fw-bold); font-size: var(--fs-l); white-space: nowrap; }
 .chip { display: inline-block; font-size: var(--fs-s); font-weight: var(--fw-bold); border-radius: var(--r-s); padding: 0 7px; margin-left: 6px; background: var(--accent-soft); color: var(--accent); vertical-align: 1px; }

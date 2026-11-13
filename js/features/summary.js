@@ -1,6 +1,6 @@
 "use strict";
 // ===== まとめ画面 =====
-// 役割: 週・月・年・期間指定（標準は月）の、使った金額・投資資金・支払い方法ごとの内訳（現金・バーコード決済・クレジットはカードごと。押すとその明細）と、お店ごとの内訳（全体またはカードごと。上位8店＋その他。横棒は1位を100%）・クレジットの引き落とし・買い物の一覧。上の期間の切り替えと2つの数字は、スクロールしても動かない（css/base.css の .pin）。年・複数月の期間指定では、買い物の一覧と明細を月ごとの帯に分け、帯は数字のすぐ下に重なって止まる（css/components.css の .mband。高さは --pin-h）
+// 役割: 週・月・年・期間指定（標準は月）の、使った金額・投資資金・支払い方法ごとの内訳（現金・バーコード決済・クレジットはカードごと。押すとその明細）と、お店ごとの内訳（全体またはカードごと。上位8店＋その他。横棒は1位を100%）・クレジットの引き落とし・記録の一覧（1件ずつ、月日・店名・支払額・支払い方法・登録方法だけ）。上の期間の切り替えと2つの数字は、スクロールしても動かない（css/base.css の .pin）。年・複数月の期間指定では、買い物の一覧と明細を月ごとの帯に分け、帯は数字のすぐ下に重なって止まる（css/components.css の .mband。高さは --pin-h）
 // 依存: util.js, model.js, stats.js, billing.js, period.js, dom.js, overlay.js, picker.js, rows.js, range-input.js
 // 実行時: なし
 // 公開: period, sumAnchor, customFrom, customTo, renderSummary
@@ -49,7 +49,8 @@ function renderSummary() {
   setSeg($("viewSeg"), (b) => b.dataset.v === sumView);
   $("payBox").hidden = sumView !== "pay"; $("shopBox").hidden = sumView !== "shop";
   if (sumView === "shop") renderShop(r, bd);
-  $("periodList").innerHTML = list.length ? groupedHtml(list, (e) => entryHtml(e, true), useBands(r.from, r.to)) : emptyHtml("この期間の買い物はありません");
+  const yr = r.from.slice(0, 4) !== r.to.slice(0, 4);
+  $("periodList").innerHTML = list.length ? groupedHtml(list, (e) => sumRowHtml(e, true, yr), useBands(r.from, r.to)) : emptyHtml("この期間の買い物はありません");
 }
 // お店ごと：名寄せして金額の大きい順に上位8店＋その他。棒は1位を100%にした長さ（割合は数字で添える）
 function renderShop(r, bd) {
@@ -73,7 +74,7 @@ $("shopBars").onclick = (e) => {
   const b = e.target.closest("[data-si]"); if (!b || !shopData) return;
   const g = shopData.rows[Number(b.dataset.si)]; if (!g) return;
   const [from, to] = shopData.range, list = shopEntries(from, to, shopScope, g.key);
-  showDetail(g.name, g.n, g.sum, shopData.total, list, (e) => '<div class="item"><span class="l"><span class="num">' + mdShort(e.date) + "</span>　" + esc(payLabel(e)) + '</span><span class="r">' + yen(e.total) + "</span></div>", from, to);
+  showDetail(g.name, g.n, g.sum, shopData.total, list, (e) => sumRowHtml(e, false, from.slice(0, 4) !== to.slice(0, 4)), from, to);
 };
 $("periodSeg").onclick = (e) => { const b = e.target.closest("[data-p]"); if (b) { period = b.dataset.p; renderSummary(); } };
 const movePeriod = (delta) => { sumAnchor = shiftAnchor(period, sumAnchor, delta); renderSummary(); };
@@ -89,10 +90,10 @@ function showDetail(title, n, sum, total, list, rowFn, from, to) {
   $("payBody").innerHTML = groupedHtml(list, rowFn, useBands(from, to));
   openOv("payOverlay"); $("payOverlay").firstElementChild.scrollTop = 0; $("payBody").scrollTop = 0;
 }
-// 支払い方法の明細（日付・お店・金額）
+// 支払い方法の明細（行は、まとめの一覧と同じ）
 function openPay(i) {
   const g = payRows[i]; if (!g) return;
   const total = payRows.reduce((a, x) => a + x.sum, 0);
-  showDetail(g.name, g.n, g.sum, total, payEntries(payRange[0], payRange[1], g.key), (e) => '<div class="item"><span class="l"><span class="num">' + mdShort(e.date) + "</span>　" + esc(e.store || "お店の名前なし") + '</span><span class="r">' + yen(e.total) + "</span></div>", payRange[0], payRange[1]);
+  showDetail(g.name, g.n, g.sum, total, payEntries(payRange[0], payRange[1], g.key), (e) => sumRowHtml(e, false, payRange[0].slice(0, 4) !== payRange[1].slice(0, 4)), payRange[0], payRange[1]);
 }
 $("payBars").onclick = (e) => { const b = e.target.closest("[data-pi]"); if (b) openPay(Number(b.dataset.pi)); };
