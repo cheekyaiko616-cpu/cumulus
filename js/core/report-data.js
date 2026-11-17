@@ -3,9 +3,10 @@
 // 役割: 指定した月の全件（取引・品目）と集計・投資の記録を、Claudeに渡す・Googleスプレッドシートへ送る形（JSON）にまとめ、貼り付け用の文章（依頼文＋表）と送信の本文を作る。送らないもの（支店名・メモ・番号・写真・URL・合言葉）は、ここで取り除く。集計は rangeStats・payBreakdown を使う。通信と画面は features/report.js
 // 依存: util.js, model.js, billing.js, stats.js
 // 実行時: receipt-dict.js
-// 公開: REPORT_MAX_TX, REPORT_MAX_ITEMS, normReport, reportPrevMonth, reportMonths, reportMonthSpan, reportClean, reportStore, reportBuild, reportOver, reportText, reportBody, reportDue, reportSamples
+// 公開: REPORT_MAX_TX, REPORT_MAX_ITEMS, normReport, reportPrevMonth, reportMonths, reportMonthSpan, reportClean, reportStore, reportBuild, reportOver, reportText, reportPlan, reportBody, reportDue, reportSamples
 
 const REPORT_MAX_TX = 5000, REPORT_MAX_ITEMS = 20000;   // 1か月の取引・品目の上限（Code.gs と同じ）
+const REPORT_PART_TX = 1500, REPORT_PART_ITEMS = 4000;   // 1回の送信の取引・品目の上限（超える月は、取引を区切りに分けて送る。ふつうの月は1回）
 const REPORT_NAME = 60;                                 // 店名・品名の長さの上限
 const REPORT_REG = { hand: "手入力・レシート", mail: "メール", both: "メール・レシート" };   // 登録方法（まとめの札と同じ呼び方）
 
@@ -82,8 +83,23 @@ function reportBuild(month, anon) {
   return { v: 1, month, anon: !!anon, summary: { total: st.spent, prevTotal: pv.spent, count: tx.length, itemCount, savedDays: st.savedDays, invest: st.invest, invested: st.invested }, pay, tx, invests };
 }
 const reportOver = (d) => d.tx.length > REPORT_MAX_TX || d.summary.itemCount > REPORT_MAX_ITEMS;
-// 送信の本文（合言葉は本文に入れる。URLには付けない）
-const reportBody = (d, token) => JSON.stringify(Object.assign({ token }, d));
+// 送り方の計画：取引（と、その品目）を、順番どおり REPORT_PART_TX 件・品目 REPORT_PART_ITEMS 件までずつの分けにする（ふつうの月は1つ）。txAt・itemAt は、その分より前の取引・品目の数（スプレッドシートの書き込み位置）
+function reportPlan(d) {
+  const out = []; let cur = [], items = 0, txAt = 0, itemAt = 0;
+  d.tx.forEach((x) => {
+    if (cur.length && (cur.length >= REPORT_PART_TX || items + x.items.length > REPORT_PART_ITEMS)) { out.push({ tx: cur, txAt, itemAt }); txAt += cur.length; itemAt += items; cur = []; items = 0; }
+    cur.push(x); items += x.items.length;
+  });
+  out.push({ tx: cur, txAt, itemAt });
+  return out;
+}
+// 送信の本文（合言葉は本文に入れる。URLには付けない）。支払い方法別（pay）・店名の置き換えの印は送らない（シート側で使わない）。集計と投資の記録は最後の分だけに入れる。sid は、この送信を見分ける印（保存できたかの確認に使う）
+function reportBody(d, token, sid, plan, i) {
+  if (!sid) return JSON.stringify({ token, v: 1, month: d.month, summary: d.summary, tx: d.tx, invests: d.invests });
+  const p = plan[i], last = i === plan.length - 1, o = { token, v: 1, month: d.month, sid, seq: i, last, txAt: p.txAt, itemAt: p.itemAt, tx: p.tx };
+  if (last) { o.summary = d.summary; o.invests = d.invests; }
+  return JSON.stringify(o);
+}
 // 確認用：金額の多い店の例（空の店名は除く）
 function reportSamples(d, n) {
   const g = new Map();

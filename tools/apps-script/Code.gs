@@ -6,6 +6,9 @@
  * ・アプリに返すのは、日付・時刻・金額・利用先だけです（メールの本文は返しません）
  * ・TOKEN（合言葉）が一致しない呼び出しには、何も返しません
  * ・月次レポート（doPost）：アプリが月が替わると送る「先月の取引の全件」を、あなたのGoogleドライブのスプレッドシート「Cumulus 月次」に保存します（月ごとのシート「YYYY-MM」と「概要」。同じ月は上書き）。スプレッドシートの権限が必要です（更新後の初回に許可を求められます）
+ * ・書き込みは、件数に関わらず一定回数（範囲ごとに1回の setValues・最後に flush 1回）。数千件を送るときは、アプリが数回に分けて送ります（最初の分で全消去、続きは決まった行へ書く）。実行時間の上限は6分。目安は、通常の月（数百件）で数秒、初回（スプレッドシートの作成を含む）で10秒前後、5,000件で1回の分けあたり数秒
+ * ・保存できたかは、doGet の action=status で確かめられます（版・月・件数・時刻だけを返し、記録の中身は返しません）
+ * ・貼り替えたあとは、エディタ上部の関数名の欄で authorizeReport を選んで「実行」し、許可を与えてから、新バージョンでデプロイしてください（ウェブアプリは、許可が済むまで止まることがあります）
  */
 const TOKEN = "__TOKEN__";   // アプリが作った合言葉。アプリの「スクリプトをコピー」で自動で入ります
 const DEFAULT_DAYS = 45;     // 何日前までのメールを見るか
@@ -14,7 +17,11 @@ const MAX_THREADS = 100;     // 一度に見るメールの上限
 // ---- 月次レポート（doPost）の決まり ----
 const BOOK_NAME = "Cumulus 月次";   // 保存先のスプレッドシート名（初回に作り、IDをスクリプトの保存領域に覚える）
 const BOOK_PROP = "REPORT_BOOK_ID";
-const MAX_BODY = 3000000;            // 受け取る本文の上限（文字数）
+const MAX_BODY = 3000000;            // 受け取る本文の上限（文字数。分けて送るときは1回ぶん）
+const CUR_PROP = "REPORT_CUR", DONE_PROP = "REPORT_DONE";   // 送信の途中経過（分けて送るとき）・最後に保存できた月（状態の確認用）
+const LOCK_MS = 10000;               // 同時に動いている書き込みを待つ時間。取れなければ busy を返す
+const MAX_PARTS = 40;
+const VERSION = "2";                  // スクリプトの版（アプリの「接続を確かめる」で表示）
 const MAX_TX = 5000, MAX_ITEMS = 20000, MAX_INVESTS = 500, MAX_ITEMS_PER_TX = 200;
 const PAY_NAMES = ["現金", "バーコード決済", "クレジット"];
 const REG_NAMES = ["手入力・レシート", "メール", "メール・レシート"];
@@ -27,6 +34,7 @@ const ISSUERS = [
 function doGet(e) {
   const p = (e && e.parameter) || {};
   if (TOKEN === "__TOKEN__" || !p.token || p.token !== TOKEN) return reply({ ok: false, error: "token" });
+  if (p.action === "status") return reportStatus(p);
   const days = Math.max(1, Math.min(120, Number(p.days) || DEFAULT_DAYS));
   const since = Date.now() - days * 86400000;
   const items = [];
@@ -49,7 +57,8 @@ function doGet(e) {
 }
 
 // ---- 月次レポートの保存（POST）。本文は text/plain の JSON。合言葉は本文の token ----
-// 返すのは {ok, month, rows, items}。エラーは {ok:false, error:"token"|"json"|"size"|"data"|"server"} だけ。取引の中身はログに出さない
+// 本文：{token, month, sid, seq, last, txAt, itemAt, tx, summary, invests}。分けない送信は seq 省略（=0・last=true）。分けるときは seq=0 で全消去、続きの seq は txAt・itemAt の行から書く（同じ seq を送り直しても重複しない）。summary・invests は last のときだけ
+// 返すのは {ok, month, rows, items, seq, last}。エラーは {ok:false, error:"token"|"json"|"size"|"data"|"busy"|"order"|"server"} だけ。取引の中身はログに出さない
 function doPost(e) {
   let lock = null;
   try {
@@ -62,16 +71,42 @@ function doPost(e) {
     const bad = checkReport(d);
     if (bad) return reply({ ok: false, error: "data" });
     lock = LockService.getScriptLock();
-    lock.waitLock(20000);
-    const ss = openBook();
-    const rows = writeMonth(ss, d);
-    writeOverview(ss, d);
-    return reply({ ok: true, month: d.month, rows: rows.tx, items: rows.items });
+    if (!lock.tryLock(LOCK_MS)) { lock = null; return reply({ ok: false, error: "busy" }); }   // ほかの書き込み中。待ち続けずに返す（アプリは後で試し直す）
+    const seq = d.seq || 0, last = d.last !== false, props = PropertiesService.getScriptProperties();
+    if (seq > 0) {                                                                           // 続きの分け：直前までの分と同じ送信（sid）・月のときだけ書く
+      const cur = readProp(props, CUR_PROP);
+      if (!cur || cur.sid !== d.sid || cur.month !== d.month || (seq !== cur.seq && seq !== cur.seq + 1)) return reply({ ok: false, error: "order" });
+    }
+    const ss = openBook(props);
+    const w = writeMonth(ss, d, seq);
+    if (!w) return reply({ ok: false, error: "order" });
+    if (last) writeOverview(ss, d);
+    SpreadsheetApp.flush();                                                                  // 最後に1回だけ
+    const sid = typeof d.sid === "string" ? d.sid : "";
+    if (last) { props.setProperty(DONE_PROP, JSON.stringify({ sid: sid, month: d.month, rows: w.rows, items: w.items, at: new Date().toISOString() })); props.deleteProperty(CUR_PROP); }
+    else props.setProperty(CUR_PROP, JSON.stringify({ sid: sid, month: d.month, seq: seq }));
+    return reply({ ok: true, month: d.month, rows: w.rows, items: w.items, seq: seq, last: last });
   } catch (err) {
     return reply({ ok: false, error: "server" });
   } finally {
     if (lock) { try { lock.releaseLock(); } catch (err2) {} }
   }
+}
+// 許可を与えるためだけの関数。エディタで1回実行する（データは作らない・書かない。スプレッドシートとドライブに触れる許可の画面を出すだけ）
+function authorizeReport() {
+  SpreadsheetApp.getActiveSpreadsheet();
+  DriveApp.getRootFolder().getName();
+  PropertiesService.getScriptProperties().getProperty(BOOK_PROP);
+}
+function readProp(props, k) { try { return JSON.parse(props.getProperty(k) || "null"); } catch (err) { return null; } }
+
+// ---- 保存の確認（GET ?action=status&month=YYYY-MM&sid=…&token=…）。月・件数・時刻と、その送信（sid）が最後まで保存されたかだけを返す。記録の中身は返さない ----
+function reportStatus(p) {
+  const props = PropertiesService.getScriptProperties();
+  const done = readProp(props, DONE_PROP), cur = readProp(props, CUR_PROP);
+  const sid = typeof p.sid === "string" ? p.sid : "";
+  const mine = !!done && !!sid && done.sid === sid;
+  return reply({ ok: true, version: VERSION, hasSheet: !!props.getProperty(BOOK_PROP), lastMonth: done ? done.month : "", rows: done ? done.rows : 0, saved: mine, partial: !mine && !!cur && !!sid && cur.sid === sid, at: done ? done.at : "" });
 }
 
 const isInt = function (v, lo, hi) { return typeof v === "number" && isFinite(v) && Math.floor(v) === v && v >= lo && v <= hi; };
@@ -81,31 +116,36 @@ const isDay = function (v) { return typeof v === "string" && /^\d{4}-(0[1-9]|1[0
 // 形・型・長さの点検。問題があれば理由の文字（中身は含めない）、なければ ""
 function checkReport(d) {
   if (typeof d.month !== "string" || !/^\d{4}-(0[1-9]|1[0-2])$/.test(d.month)) return "month";
-  const s = d.summary;
-  if (!s || typeof s !== "object") return "summary";
-  const keys = ["total", "prevTotal", "count", "itemCount", "savedDays", "invest", "invested"];
-  for (let i = 0; i < keys.length; i++) if (!isInt(s[keys[i]], -1e12, 1e12)) return "summary";
-  if (!Array.isArray(d.tx) || d.tx.length > MAX_TX) return "tx";
+  const part = d.seq !== undefined || d.last !== undefined || d.txAt !== undefined || d.itemAt !== undefined || d.sid !== undefined;
+  if (part && !(isInt(d.seq, 0, MAX_PARTS) && typeof d.last === "boolean" && isInt(d.txAt, 0, MAX_TX) && isInt(d.itemAt, 0, MAX_ITEMS) && isStr(d.sid, 64) && d.sid && (d.seq > 0 || (d.txAt === 0 && d.itemAt === 0)))) return "part";
+  const last = d.last !== false;
+  if (last) {
+    const s = d.summary;
+    if (!s || typeof s !== "object") return "summary";
+    const keys = ["total", "prevTotal", "count", "itemCount", "savedDays", "invest", "invested"];
+    for (let i = 0; i < keys.length; i++) if (!isInt(s[keys[i]], -1e12, 1e12)) return "summary";
+  }
+  if (!Array.isArray(d.tx) || d.tx.length > MAX_TX || (d.txAt || 0) + d.tx.length > MAX_TX) return "tx";
   let items = 0;
   for (let i = 0; i < d.tx.length; i++) {
     const x = d.tx[i];
     if (!x || typeof x !== "object" || !isInt(x.id, 1, 1e6) || !isDay(x.d) || x.d.slice(0, 7) !== d.month || !isStr(x.s, 200) || !isInt(x.t, -1e12, 1e12)) return "tx";
     if (PAY_NAMES.indexOf(x.pay) < 0 || !isStr(x.card, 100) || REG_NAMES.indexOf(x.reg) < 0 || !Array.isArray(x.items) || x.items.length > MAX_ITEMS_PER_TX) return "tx";
     items += x.items.length;
-    if (items > MAX_ITEMS) return "items";
+    if (items > MAX_ITEMS || (d.itemAt || 0) + items > MAX_ITEMS) return "items";
     for (let j = 0; j < x.items.length; j++) {
       const it = x.items[j];
       if (!it || typeof it !== "object" || !isStr(it.n, 200) || !isInt(it.p, -1e12, 1e12)) return "items";
     }
   }
+  if (!last) return "";
   if (!Array.isArray(d.invests) || d.invests.length > MAX_INVESTS) return "invests";
   for (let i = 0; i < d.invests.length; i++) { const v = d.invests[i]; if (!v || !isDay(v.d) || !isInt(v.a, 0, 1e12)) return "invests"; }
   return "";
 }
 
-// 保存先のスプレッドシート。初回に作り、IDを覚える（消された・開けないときは作り直す）
-function openBook() {
-  const props = PropertiesService.getScriptProperties();
+// 保存先のスプレッドシート。初回に作り、IDを覚える（消された・開けないときは作り直す）。保存領域の読み書きは、通常1回の読み取りだけ
+function openBook(props) {
   const id = props.getProperty(BOOK_PROP);
   if (id) { try { return SpreadsheetApp.openById(id); } catch (err) {} }
   const ss = SpreadsheetApp.create(BOOK_NAME);
@@ -114,43 +154,51 @@ function openBook() {
   if (first) first.setName("概要");
   return ss;
 }
-// 先頭が = + - @ の文字が数式にならないよう、文字の列は「書式なしテキスト」にしてから書く
-function putTable(sh, row, col, head, body, textCols) {
-  const n = body.length + 1, w = head.length;
-  if (sh.getMaxRows() < row + n - 1) sh.insertRowsAfter(sh.getMaxRows(), row + n - 1 - sh.getMaxRows());
+// 範囲への書き込みは、2次元配列を1回の setValues で（行・セルごとには書かない）。足りない行・列は、必要なときだけ1回で足す
+function put(sh, row, col, rows) {
+  if (!rows.length) return;
+  const w = rows[0].length, need = row + rows.length - 1;
+  if (sh.getMaxRows() < need) sh.insertRowsAfter(sh.getMaxRows(), need - sh.getMaxRows());
   if (sh.getMaxColumns() < col + w - 1) sh.insertColumnsAfter(sh.getMaxColumns(), col + w - 1 - sh.getMaxColumns());
-  textCols.forEach(function (c) { sh.getRange(row, col + c, n, 1).setNumberFormat("@"); });
-  sh.getRange(row, col, 1, w).setValues([head]);
-  if (body.length) sh.getRange(row + 1, col, body.length, w).setValues(body);
+  sh.getRange(row, col, rows.length, w).setValues(rows);
 }
-// 月ごとのシート「YYYY-MM」：取引（A〜G）・品目（I〜K）・投資（M〜N）。同じ月は全部消して書き直す（重複しない）
-function writeMonth(ss, d) {
-  const sh = ss.getSheetByName(d.month) || ss.insertSheet(d.month);
-  sh.clear();
+// 月ごとのシート「YYYY-MM」：取引（A〜G）・品目（I〜K）・投資（M〜N）。同じ月は、最初の分（seq=0）で全部消して書き直す（重複しない）。続きの分は、txAt・itemAt の行へ書く
+// 先頭が = + - @ の文字が数式にならないよう、文字の列は「書式なしテキスト」にしてから書く（列ごとに、最初の分で1回の呼び出し）
+function writeMonth(ss, d, seq) {
+  let sh = ss.getSheetByName(d.month);
+  if (!sh) { if (seq > 0) return null; sh = ss.insertSheet(d.month); }   // 続きの分なのにシートがない（消された）ときは、書かない
+  const first = seq === 0, txAt = d.txAt || 0, itemAt = d.itemAt || 0;
   const tx = [], items = [];
   d.tx.forEach(function (x) {
     tx.push([x.id, x.d, x.s, x.t, x.pay, x.card, x.reg]);
     x.items.forEach(function (it) { items.push([x.id, it.n, it.p]); });
   });
-  putTable(sh, 1, 1, ["取引ID", "日付", "店名", "金額", "支払い", "カード", "登録方法"], tx, [1, 2, 4, 5, 6]);
-  putTable(sh, 1, 9, ["取引ID", "品名", "金額"], items, [1]);
-  putTable(sh, 1, 13, ["投資の日付", "投資の金額"], d.invests.map(function (v) { return [v.d, v.a]; }), [0]);
-  return { tx: tx.length, items: items.length };
+  if (first) {
+    sh.clear();
+    sh.getRangeList(["B:C", "E:G", "J:J", "M:M"]).setNumberFormat("@");
+    put(sh, 1, 1, [["取引ID", "日付", "店名", "金額", "支払い", "カード", "登録方法"]]);
+    put(sh, 1, 9, [["取引ID", "品名", "金額"]]);
+    put(sh, 1, 13, [["投資の日付", "投資の金額"]]);
+  }
+  put(sh, 2 + txAt, 1, tx);
+  put(sh, 2 + itemAt, 9, items);
+  if (d.last !== false) put(sh, 2, 13, (d.invests || []).map(function (v) { return [v.d, v.a]; }));
+  return { rows: txAt + tx.length, items: itemAt + items.length };
 }
-// 「概要」シート：月ごとに1行（同じ月は更新）
+// 「概要」シート：月ごとに1行（同じ月は更新）。月の列は1回の読み取りで探し、書き込みは1回
 function writeOverview(ss, d) {
   const sh = ss.getSheetByName("概要") || ss.insertSheet("概要", 0);
   const head = ["月", "合計", "前月合計", "前月との差", "前月比(%)", "取引数", "品目数", "使わなかった日数", "貯まった投資額", "投資した金額", "更新"];
-  if (sh.getLastRow() < 1) sh.getRange(1, 1, 1, head.length).setValues([head]);
+  const last = sh.getLastRow();
   const s = d.summary;
   const row = [d.month, s.total, s.prevTotal, s.total - s.prevTotal, s.prevTotal > 0 ? Math.round(s.total / s.prevTotal * 1000) / 10 : "", s.count, s.itemCount, s.savedDays, s.invest, s.invested, new Date().toISOString()];
-  const last = sh.getLastRow();
   let at = 0;
   if (last >= 2) {
     const months = sh.getRange(2, 1, last - 1, 1).getValues();
     for (let i = 0; i < months.length; i++) if (String(months[i][0]) === d.month) { at = i + 2; break; }
   }
   if (!at) at = Math.max(last, 1) + 1;
+  if (last < 1) sh.getRange(1, 1, 1, head.length).setValues([head]);
   sh.getRange(at, 1, 1, 1).setNumberFormat("@");
   sh.getRange(at, 1, 1, row.length).setValues([row]);
 }
