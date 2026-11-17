@@ -6,6 +6,7 @@
 // 公開: rp, rpBlocked, rpTryAt, rpBusy, rpClear, postReport, sendReport, autoReport, renderReport
 
 const RP_RETRY = 10 * 60 * 1000;                                  // 失敗したあと、自動で試し直すまでの下限（10分）
+const RP_MIN_VERSION = 3;                                         // この版未満のスクリプトは新しい配置（曜日・区分・概要）に対応していない。送る前に確かめ、古ければ送らない
 const RP_TIMEOUT = 90000, RP_STATUS_TIMEOUT = 15000;              // 1回の送信を待つ上限（90秒）・保存の確認を待つ上限（15秒）
 let rp = normReport(readKey(KEY_RP));                             // 設定（別のキーに保存。記録のデータの形は変えない）
 let rpBlocked = false, rpTryAt = 0, rpBusy = false;               // rpBlocked：URL・合言葉・スクリプトの誤りで失敗したあとは、直るまで自動では試さない
@@ -14,7 +15,7 @@ let rpCache = null;
 const rpPersist = () => { tryWrite(KEY_RP, JSON.stringify(rp)); };
 function rpClear() { rp = normReport(null); dropKey(KEY_RP); rpCache = null; rpMsg(""); renderReport(); }
 const rpMsg = (t) => { $("rpMsg").textContent = t || ""; };
-const RP_ON_TEXT = "毎月、先月の取引の全件（日付・店名・金額・支払い・カード名・登録方法・品目・月の集計・投資の日付と金額）を、あなたのGoogleスプレッドシートに送ります。支店名・メモ・写真・URL・合言葉・長い数字は送りません。品名に書いた内容はそのまま含まれます。";
+const RP_ON_TEXT = "毎月、先月の取引の全件（日付・曜日・店名・金額・支払い・カード名・登録方法・区分・品目・月の集計・投資の日付と金額）を、あなたのGoogleスプレッドシートに送ります。支店名・メモ・写真・URL・合言葉・長い数字は送りません。品名に書いた内容はそのまま含まれます。";
 
 // ---- 送信（通信） ----
 // 送り先は、メール連携と同じURL（https://script.google.com/…/exec）だけ。本文はテキストのまま（text/plain。事前確認の通信が要らない）。合言葉は本文に入れ、URLには付けない。同じ月は上書きされるので、送り直しても重複しない
@@ -63,7 +64,7 @@ async function rpProbe(month, sid, ms) {
   let j; try { j = JSON.parse(await res.text()); } catch (e) { return { kind: "html" }; }
   if (!j || typeof j !== "object") return { kind: "html" };
   if (j.ok === false) return { kind: j.error === "token" ? "token" : "old" };
-  return j.ok === true && typeof j.version === "string" ? { kind: "ok", j } : { kind: "old" };
+  return j.ok === true && typeof j.version === "string" && Number(j.version) >= RP_MIN_VERSION ? { kind: "ok", j } : { kind: "old" };
 }
 // 保存できたかの確認。true=保存済み、false=未保存、null=確認できない
 async function rpStatus(month, sid) {
@@ -115,6 +116,12 @@ async function sendReport(month, manual) {
   const sid = rpSid(), done = (unc) => { if (month > rp.last) rp.last = month; rp.dm = month; rp.n = d.tx.length; rp.at = Date.now(); rp.unc = unc; rpPersist(); };
   $("rpSend").textContent = "中止"; rpMsg("送信中...");
   try {
+    const pr = await rpProbe(month, "", RP_STATUS_TIMEOUT);                              // 送る前に、スクリプトの版を1回確かめる（古ければ送らない）
+    if (pr.kind !== "ok") {
+      if (rpWhy === "cancel") { rpHold = true; rpMsg(rpErrText(new Error("cancel"))); }
+      else { if (pr.kind !== "none") rpBlocked = true; rpMsg(pr.kind === "none" ? rpErrText(null) : RP_DIAG[pr.kind]); }
+      return;
+    }
     const r = await postReport(d, sid, (i, n) => { if (n > 1) rpMsg("送信中... " + i + "/" + n); });
     if (r.unc && (await rpStatus(month, sid)) === true) r.unc = false;                // 返事を読めなかったときは、保存の確認で確かめる
     done(r.unc);

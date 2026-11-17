@@ -8,6 +8,11 @@
 const REPORT_MAX_TX = 5000, REPORT_MAX_ITEMS = 20000;   // 1か月の取引・品目の上限（Code.gs と同じ）
 const REPORT_PART_TX = 1500, REPORT_PART_ITEMS = 4000;   // 1回の送信の取引・品目の上限（超える月は、取引を区切りに分けて送る。ふつうの月は1回）
 const REPORT_NAME = 60;                                 // 店名・品名の長さの上限
+const REPORT_KIND_SAVE = "積立・投資", REPORT_KIND_DAILY = "日常";   // 区分（店名のキーワードによる推定。積立・投資の可能性が高い支払い）
+// キーワード（NFKC・小文字にそろえて、店名に含まれるか見る）。「証券」を含む店名（野村・大和・日興・松井・楽天・SBIなどの証券会社）で判断し、野村・大和・日興だけでは判定しない（大和ハウスなどの誤判定を避ける）。ASCII の語は前後が英字でないときだけ
+const REPORT_SAVE_WORDS = ["証券", "證券", "投資信託", "投信", "積立", "つみたて", "ニーサ", "イデコ", "ウェルスナビ", "ひふみ", "マネックス"];
+const REPORT_SAVE_ASCII = /(?:^|[^a-z])(?:nisa|ideco)(?![a-z])/;
+const REPORT_WEEK = "日月火水木金土";
 const REPORT_REG = { hand: "手入力・レシート", mail: "メール", both: "メール・レシート" };   // 登録方法（まとめの札と同じ呼び方）
 
 // ---- 月の計算（"2026-10" の形。月は1始まり） ----
@@ -55,6 +60,17 @@ function reportStore(raw) {
   }
   return t.slice(0, REPORT_NAME) || t0.slice(0, REPORT_NAME);
 }
+// 区分：店名にキーワードがあれば「積立・投資」、なければ「日常」（純関数）
+function reportKind(store) {
+  const t = String(store || "").normalize("NFKC").toLowerCase();
+  return REPORT_SAVE_WORDS.some((w) => t.includes(w)) || REPORT_SAVE_ASCII.test(t) ? REPORT_KIND_SAVE : REPORT_KIND_DAILY;
+}
+// 曜日（"2026-10-02" → "金"）。日付から計算する（純関数）
+const reportWeekday = (d) => REPORT_WEEK[new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)))).getUTCDay()];
+// 使わなかった日数・貯まった投資額の表記：月が数え始める日より前なら「未計算(開始日 …)」、月の途中から数えたなら「n(開始日 …以降のみ)」
+const reportDaysText = (s, v) => s.uncalc ? "未計算(開始日 " + s.uncalc + ")" : s.partial ? v + "(開始日 " + s.partial + "以降のみ)" : v;
+// 前月比（%）：前月が無い・0 のときは「該当なし」
+const reportRatio = (s) => s.prevTotal > 0 ? Math.round(s.total / s.prevTotal * 1000) / 10 : "該当なし";
 const reportLetters = (n) => { let s = ""; n++; while (n > 0) { n--; s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26); } return s; };
 
 // ---- 月のデータ ----
@@ -68,10 +84,12 @@ function reportBuild(month, anon) {
   let itemCount = 0;
   const tx = list.map((e, i) => {
     const reg = e.src === "mail" ? (e.rc ? REPORT_REG.both : REPORT_REG.mail) : REPORT_REG.hand;
-    const items = e.items.map((it) => ({ n: reportClean(it.n, REPORT_NAME), p: it.p }));
+    const sname = nameOf(e.store), none = new Set([shopNorm(reportClean(e.store, 200)), shopNorm(sname)]);   // 品名が空・店名と同じ品目（品目が実質ない取引）は送らない
+    const items = e.items.map((it) => ({ n: reportClean(it.n, REPORT_NAME), p: it.p })).filter((it) => { const k = shopNorm(it.n); return k && !none.has(k); });
     itemCount += items.length;
-    return { id: i + 1, d: e.date, s: nameOf(e.store), t: e.total, pay: PAY[e.pay], card: e.pay === "credit" ? reportClean(e.card, 40) : "", reg, items };
+    return { id: i + 1, d: e.date, w: reportWeekday(e.date), s: sname, t: e.total, pay: PAY[e.pay], card: e.pay === "credit" ? reportClean(e.card, 40) : "", reg, k: reportKind(reportClean(e.store, 200)), items };
   });
+  const saveTotal = tx.reduce((a, x) => a + (x.k === REPORT_KIND_SAVE ? x.t : 0), 0), start = state.start;
   if (anon) {
     const sum = new Map();
     tx.forEach((x) => { if (x.s) { const k = shopNorm(x.s); sum.set(k, (sum.get(k) || 0) + x.t); } });
@@ -80,7 +98,7 @@ function reportBuild(month, anon) {
   }
   const pay = payBreakdown(from, to).rows.map((r) => ({ name: r.pay === "credit" ? reportClean(r.name, 40) || NO_CARD : r.name, sum: r.sum, n: r.n }));
   const invests = state.invests.filter((v) => v.date >= from && v.date <= to).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).map((v) => ({ d: v.date, a: v.amount }));
-  return { v: 1, month, anon: !!anon, summary: { total: st.spent, prevTotal: pv.spent, count: tx.length, itemCount, savedDays: st.savedDays, invest: st.invest, invested: st.invested }, pay, tx, invests };
+  return { v: 1, month, anon: !!anon, summary: { total: st.spent, dailyTotal: st.spent - saveTotal, saveTotal, prevTotal: pv.spent, count: tx.length, itemCount, savedDays: st.savedDays, invest: st.invest, invested: st.invested, uncalc: start > to ? start : "", partial: start > from && start <= to ? start : "" }, pay, tx, invests };
 }
 const reportOver = (d) => d.tx.length > REPORT_MAX_TX || d.summary.itemCount > REPORT_MAX_ITEMS;
 // 送り方の計画：取引（と、その品目）を、順番どおり REPORT_PART_TX 件・品目 REPORT_PART_ITEMS 件までずつの分けにする（ふつうの月は1つ）。txAt・itemAt は、その分より前の取引・品目の数（スプレッドシートの書き込み位置）
@@ -117,14 +135,14 @@ function reportText(d) {
     "・支出の振り返り：合計、前月との比較、支払い方法別、金額や回数の多い支出",
     "・減らせそうな支出と、その具体的な方法（効果の大きい順）",
     "・来月の目安",
-    "金額の単位は円。店名は" + (d.anon ? "「店A」などの記号に置き換えてあります（同じ記号は同じ店）。" : "チェーン名に整理し、支店名は除いてあります。") + "品目は品名と金額です。",
+    "金額の単位は円。店名は" + (d.anon ? "「店A」などの記号に置き換えてあります（同じ記号は同じ店）。" : "チェーン名に整理し、支店名は除いてあります。") + "品目は品名があるものだけです（品名のない取引は空）。区分は店名のキーワードによる推定で、「積立・投資」は積立・投資の可能性が高い支払い、それ以外は「日常」です。",
     "",
     "# 集計", "項目,値",
-    reportRow(["月", d.month]), reportRow(["合計", s.total]), reportRow(["前月合計", s.prevTotal]), reportRow(["前月との差", (diff > 0 ? "+" : "") + diff]),
-    reportRow(["取引数", s.count]), reportRow(["品目数", s.itemCount]), reportRow(["使わなかった日数", s.savedDays]), reportRow(["貯まった投資額", s.invest]), reportRow(["投資した金額", s.invested]),
+    reportRow(["月", d.month]), reportRow(["合計", s.total]), reportRow(["日常支出", s.dailyTotal]), reportRow(["積立・投資額", s.saveTotal]), reportRow(["前月合計", s.prevTotal]), reportRow(["前月との差", (diff > 0 ? "+" : "") + diff]), reportRow(["前月比(%)", reportRatio(s)]),
+    reportRow(["取引数", s.count]), reportRow(["品目数", s.itemCount]), reportRow(["使わなかった日数", reportDaysText(s, s.savedDays)]), reportRow(["貯まった投資額", reportDaysText(s, s.invest)]), reportRow(["投資した金額", s.invested]),
     "", "# 支払い方法別", "支払い,金額,件数"].concat(d.pay.map((r) => reportRow([r.name, r.sum, r.n])));
-  L.push("", "# 取引", "取引ID,日付,店名,金額,支払い,カード,登録方法");
-  d.tx.forEach((x) => L.push(reportRow([x.id, x.d, x.s, x.t, x.pay, x.card, x.reg])));
+  L.push("", "# 取引", "取引ID,日付,曜日,店名,金額,支払い,カード,登録方法,区分");
+  d.tx.forEach((x) => L.push(reportRow([x.id, x.d, x.w, x.s, x.t, x.pay, x.card, x.reg, x.k])));
   L.push("", "# 品目", "取引ID,品名,金額");
   d.tx.forEach((x) => x.items.forEach((i) => L.push(reportRow([x.id, i.n, i.p]))));
   if (d.invests.length) { L.push("", "# 投資の記録", "日付,金額"); d.invests.forEach((v) => L.push(reportRow([v.d, v.a]))); }
