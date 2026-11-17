@@ -99,3 +99,5 @@ textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); 
 .shop-row b { grid-area: v; white-space: nowrap; }
 .shop-row .chev { grid-area: c; font-size: var(--fs-l); }
 .shop-row .bar { grid-area: bar; height: 10px; }
+/* 月次レポートの画面：中身が多くても、各部品を縮めない（縮むと押す場所・文字欄が44px未満になる）。シートがスクロールする */
+#reportOverlay .sheet > * { flex-shrink: 0; }

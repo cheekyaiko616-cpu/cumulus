@@ -5,10 +5,19 @@
  * ・読み取るのは、下の ISSUERS に書いた送信元（三井住友カード・JCB）の「ご利用のお知らせ」メールだけです
  * ・アプリに返すのは、日付・時刻・金額・利用先だけです（メールの本文は返しません）
  * ・TOKEN（合言葉）が一致しない呼び出しには、何も返しません
+ * ・月次レポート（doPost）：アプリが月が替わると送る「先月の取引の全件」を、あなたのGoogleドライブのスプレッドシート「Cumulus 月次」に保存します（月ごとのシート「YYYY-MM」と「概要」。同じ月は上書き）。スプレッドシートの権限が必要です（更新後の初回に許可を求められます）
  */
 const TOKEN = "__TOKEN__";   // アプリが作った合言葉。アプリの「スクリプトをコピー」で自動で入ります
 const DEFAULT_DAYS = 45;     // 何日前までのメールを見るか
 const MAX_THREADS = 100;     // 一度に見るメールの上限
+
+// ---- 月次レポート（doPost）の決まり ----
+const BOOK_NAME = "Cumulus 月次";   // 保存先のスプレッドシート名（初回に作り、IDをスクリプトの保存領域に覚える）
+const BOOK_PROP = "REPORT_BOOK_ID";
+const MAX_BODY = 3000000;            // 受け取る本文の上限（文字数）
+const MAX_TX = 5000, MAX_ITEMS = 20000, MAX_INVESTS = 500, MAX_ITEMS_PER_TX = 200;
+const PAY_NAMES = ["現金", "バーコード決済", "クレジット"];
+const REG_NAMES = ["手入力・レシート", "メール", "メール・レシート"];
 
 const ISSUERS = [
   { id: "smbc", sender: "@vpass.ne.jp", query: 'from:statement@vpass.ne.jp subject:"ご利用のお知らせ"', parse: parseSmbc },
@@ -37,6 +46,113 @@ function doGet(e) {
     });
   });
   return reply({ ok: true, items: items, unreadable: unreadable, found: found, excluded: excluded, checked: checked, at: new Date().toISOString() });
+}
+
+// ---- 月次レポートの保存（POST）。本文は text/plain の JSON。合言葉は本文の token ----
+// 返すのは {ok, month, rows, items}。エラーは {ok:false, error:"token"|"json"|"size"|"data"|"server"} だけ。取引の中身はログに出さない
+function doPost(e) {
+  let lock = null;
+  try {
+    const raw = e && e.postData && e.postData.contents;
+    if (typeof raw !== "string" || raw.length > MAX_BODY) return reply({ ok: false, error: "size" });
+    let d = null;
+    try { d = JSON.parse(raw); } catch (err) { return reply({ ok: false, error: "json" }); }
+    if (!d || typeof d !== "object" || Array.isArray(d)) return reply({ ok: false, error: "json" });
+    if (TOKEN === "__TOKEN__" || typeof d.token !== "string" || d.token !== TOKEN) return reply({ ok: false, error: "token" });
+    const bad = checkReport(d);
+    if (bad) return reply({ ok: false, error: "data" });
+    lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    const ss = openBook();
+    const rows = writeMonth(ss, d);
+    writeOverview(ss, d);
+    return reply({ ok: true, month: d.month, rows: rows.tx, items: rows.items });
+  } catch (err) {
+    return reply({ ok: false, error: "server" });
+  } finally {
+    if (lock) { try { lock.releaseLock(); } catch (err2) {} }
+  }
+}
+
+const isInt = function (v, lo, hi) { return typeof v === "number" && isFinite(v) && Math.floor(v) === v && v >= lo && v <= hi; };
+const isStr = function (v, max) { return typeof v === "string" && v.length <= max; };
+const isDay = function (v) { return typeof v === "string" && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(v); };
+
+// 形・型・長さの点検。問題があれば理由の文字（中身は含めない）、なければ ""
+function checkReport(d) {
+  if (typeof d.month !== "string" || !/^\d{4}-(0[1-9]|1[0-2])$/.test(d.month)) return "month";
+  const s = d.summary;
+  if (!s || typeof s !== "object") return "summary";
+  const keys = ["total", "prevTotal", "count", "itemCount", "savedDays", "invest", "invested"];
+  for (let i = 0; i < keys.length; i++) if (!isInt(s[keys[i]], -1e12, 1e12)) return "summary";
+  if (!Array.isArray(d.tx) || d.tx.length > MAX_TX) return "tx";
+  let items = 0;
+  for (let i = 0; i < d.tx.length; i++) {
+    const x = d.tx[i];
+    if (!x || typeof x !== "object" || !isInt(x.id, 1, 1e6) || !isDay(x.d) || x.d.slice(0, 7) !== d.month || !isStr(x.s, 200) || !isInt(x.t, -1e12, 1e12)) return "tx";
+    if (PAY_NAMES.indexOf(x.pay) < 0 || !isStr(x.card, 100) || REG_NAMES.indexOf(x.reg) < 0 || !Array.isArray(x.items) || x.items.length > MAX_ITEMS_PER_TX) return "tx";
+    items += x.items.length;
+    if (items > MAX_ITEMS) return "items";
+    for (let j = 0; j < x.items.length; j++) {
+      const it = x.items[j];
+      if (!it || typeof it !== "object" || !isStr(it.n, 200) || !isInt(it.p, -1e12, 1e12)) return "items";
+    }
+  }
+  if (!Array.isArray(d.invests) || d.invests.length > MAX_INVESTS) return "invests";
+  for (let i = 0; i < d.invests.length; i++) { const v = d.invests[i]; if (!v || !isDay(v.d) || !isInt(v.a, 0, 1e12)) return "invests"; }
+  return "";
+}
+
+// 保存先のスプレッドシート。初回に作り、IDを覚える（消された・開けないときは作り直す）
+function openBook() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty(BOOK_PROP);
+  if (id) { try { return SpreadsheetApp.openById(id); } catch (err) {} }
+  const ss = SpreadsheetApp.create(BOOK_NAME);
+  props.setProperty(BOOK_PROP, ss.getId());
+  const first = ss.getSheets()[0];
+  if (first) first.setName("概要");
+  return ss;
+}
+// 先頭が = + - @ の文字が数式にならないよう、文字の列は「書式なしテキスト」にしてから書く
+function putTable(sh, row, col, head, body, textCols) {
+  const n = body.length + 1, w = head.length;
+  if (sh.getMaxRows() < row + n - 1) sh.insertRowsAfter(sh.getMaxRows(), row + n - 1 - sh.getMaxRows());
+  if (sh.getMaxColumns() < col + w - 1) sh.insertColumnsAfter(sh.getMaxColumns(), col + w - 1 - sh.getMaxColumns());
+  textCols.forEach(function (c) { sh.getRange(row, col + c, n, 1).setNumberFormat("@"); });
+  sh.getRange(row, col, 1, w).setValues([head]);
+  if (body.length) sh.getRange(row + 1, col, body.length, w).setValues(body);
+}
+// 月ごとのシート「YYYY-MM」：取引（A〜G）・品目（I〜K）・投資（M〜N）。同じ月は全部消して書き直す（重複しない）
+function writeMonth(ss, d) {
+  const sh = ss.getSheetByName(d.month) || ss.insertSheet(d.month);
+  sh.clear();
+  const tx = [], items = [];
+  d.tx.forEach(function (x) {
+    tx.push([x.id, x.d, x.s, x.t, x.pay, x.card, x.reg]);
+    x.items.forEach(function (it) { items.push([x.id, it.n, it.p]); });
+  });
+  putTable(sh, 1, 1, ["取引ID", "日付", "店名", "金額", "支払い", "カード", "登録方法"], tx, [1, 2, 4, 5, 6]);
+  putTable(sh, 1, 9, ["取引ID", "品名", "金額"], items, [1]);
+  putTable(sh, 1, 13, ["投資の日付", "投資の金額"], d.invests.map(function (v) { return [v.d, v.a]; }), [0]);
+  return { tx: tx.length, items: items.length };
+}
+// 「概要」シート：月ごとに1行（同じ月は更新）
+function writeOverview(ss, d) {
+  const sh = ss.getSheetByName("概要") || ss.insertSheet("概要", 0);
+  const head = ["月", "合計", "前月合計", "前月との差", "前月比(%)", "取引数", "品目数", "使わなかった日数", "貯まった投資額", "投資した金額", "更新"];
+  if (sh.getLastRow() < 1) sh.getRange(1, 1, 1, head.length).setValues([head]);
+  const s = d.summary;
+  const row = [d.month, s.total, s.prevTotal, s.total - s.prevTotal, s.prevTotal > 0 ? Math.round(s.total / s.prevTotal * 1000) / 10 : "", s.count, s.itemCount, s.savedDays, s.invest, s.invested, new Date().toISOString()];
+  const last = sh.getLastRow();
+  let at = 0;
+  if (last >= 2) {
+    const months = sh.getRange(2, 1, last - 1, 1).getValues();
+    for (let i = 0; i < months.length; i++) if (String(months[i][0]) === d.month) { at = i + 2; break; }
+  }
+  if (!at) at = Math.max(last, 1) + 1;
+  sh.getRange(at, 1, 1, 1).setNumberFormat("@");
+  sh.getRange(at, 1, 1, row.length).setValues([row]);
 }
 
 // 本文を読む。まずプレーンテキスト。読めなければ、HTML版からタグを除いた文字列で読み直す（HTMLだけ・表組みのメール用）

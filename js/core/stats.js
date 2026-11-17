@@ -3,7 +3,7 @@
 // 役割: 日付ごとの索引（byDate）を作り、使った金額・使わなかった日・投資資金・支払い方法ごと／お店ごとの内訳（お店は表記ゆれをまとめる）を数える。お店の名寄せは、チェーン名の辞書（receipt-parse.js・receipt-dict.js）を呼ぶときに読む
 // 依存: util.js, model.js, billing.js
 // 実行時: receipt-dict.js, receipt-parse.js
-// 公開: byDate, reindex, spentOn, isSavedDay, rangeStats, monthStats, payBreakdown, payEntries, groupByMonth, shopBreakdown, shopEntries
+// 公開: byDate, reindex, spentOn, isSavedDay, rangeStats, monthStats, payBreakdown, payEntries, groupByMonth, shopBreakdown, shopEntries, shopNorm, shopChains, shopKey
 
 let byDate = {};
 // 記録が変わったら呼ぶ：日付ごとの索引と、カードの引き落としを作り直す

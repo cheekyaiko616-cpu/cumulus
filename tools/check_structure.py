@@ -30,7 +30,8 @@ renderSummary renderSettings renderMail renderMonthList rangeStats monthStats is
 addDays dayNo daysBetween todayStr cycleEnd cycleStart payDateOf makeCard normInvests normMail findMailMatch setPay rowHtml updateTotal
 updateCardHint updateMatch openOv closeOv openStack armed toast refreshIfNewDay scheduleMidnight state byDate pays paysByDate KEY storageOk
 dirty RENDER tab period customFrom customTo invMode invFrom invTo invAnchor sumAnchor viewYear viewMonth dayKey matchMode mailBlocked
-mailTryAt lastToday midnightTimer entryHtml renderDay renderNextPay renderCardList readRows editing editPay ocrBusy mailBusy""".split())
+mailTryAt lastToday midnightTimer entryHtml renderDay renderNextPay renderCardList readRows editing editPay ocrBusy mailBusy
+rp rpBlocked rpTryAt rpBusy postReport sendReport reportPrevMonth reportMonthSpan reportClean reportStore""".split())
 
 # 絵文字（Extended_Pictographic の主な範囲＋異体字選択子・ZWJ・囲み数字・国旗）。✓ ✕ ‹ › ▼ ＋ ・ ¥ 〜 などの記号は絵文字ではないので使ってよい
 EMOJI_OK = set("\u2713\u2715")

@@ -128,6 +128,10 @@
     <div class="card menu-card">
       <button class="menu-row" id="openMail" type="button"><span>メールから自動取り込み</span><span class="menu-r" id="mailSummary"></span><span class="chev" aria-hidden="true">›</span></button>
     </div>
+    <h2 class="grp">月次レポート</h2>
+    <div class="card menu-card">
+      <button class="menu-row" id="openReport" type="button"><span>月次レポート</span><span class="menu-r" id="rpSummary"></span><span class="chev" aria-hidden="true">›</span></button>
+    </div>
     <h2 class="grp">データ</h2>
     <div class="card menu-card">
       <button class="menu-row" id="bkSave" type="button"><span>バックアップを保存</span><span class="menu-r" id="bkLast"></span></button>
@@ -278,6 +282,28 @@
   <div class="sheet-foot"><div class="foot-btns"><button class="cancel" data-close="mailPrevOverlay" type="button">キャンセル</button><button class="primary" id="mpOk" type="button">記録する</button></div></div>
 </div></div>
 
+<!-- 月次レポート -->
+<div class="overlay" id="reportOverlay" hidden><div class="sheet has-foot gutter" role="dialog" aria-modal="true" aria-labelledby="rpTitle">
+  <div class="sheet-head"><h2 id="rpTitle" style="text-align:left">月次レポート</h2></div>
+  <label class="f">月<select id="rpMonth" data-pick="月"></select></label>
+  <div class="note" id="rpPrev"></div>
+  <div class="seg" id="rpAnonSeg" role="group" aria-label="店名"><button type="button" data-a="0">店名はそのまま</button><button type="button" data-a="1">店A・店B…にする</button></div>
+  <button class="primary" id="rpCopy" type="button">先月のレポート用データをコピー</button>
+  <textarea id="rpText" readonly rows="6" aria-label="レポート用データ" hidden></textarea>
+  <div class="subhead">月次の自動送信</div>
+  <div class="seg" id="rpAutoSeg" role="group" aria-label="月次の自動送信"><button type="button" data-a="0">オフ</button><button type="button" data-a="1">オン</button></div>
+  <div id="rpOnBox" hidden>
+    <p class="hint" id="rpOnText"></p>
+    <div class="foot-btns"><button class="cancel" id="rpOnNo" type="button">やめる</button><button class="primary" id="rpOnOk" type="button">オンにする</button></div>
+  </div>
+  <p class="hint" id="rpNeed"></p>
+  <button class="dashed" id="rpSend" type="button">今すぐ送る（先月分）</button>
+  <p class="status" id="rpMsg" role="status"></p>
+  <p class="hint" id="rpLast"></p>
+  <p class="hint">送るには、スクリプトをコピーし直し、新バージョンでデプロイして、新しい許可（スプレッドシート）を与えてください。</p>
+  <div class="sheet-foot"><button class="cancel" data-close="reportOverlay" type="button">閉じる</button></div>
+</div></div>
+
 <!-- 年月を選ぶ -->
 <div class="overlay" id="monthOverlay" data-backdrop hidden><div class="sheet gutter" role="dialog" aria-modal="true" aria-labelledby="monthTitle">
   <div class="sheet-head"><h2 id="monthTitle">年月を選ぶ</h2></div>
@@ -301,6 +327,7 @@
 <script src="js/core/sample.js"></script>
 <script src="js/core/billing.js"></script>
 <script src="js/core/stats.js"></script>
+<script src="js/core/report-data.js"></script>
 <script src="js/core/backup-file.js"></script>
 <script src="js/core/period.js"></script>
 <script src="js/core/mail-plan.js"></script>
@@ -326,6 +353,7 @@
 <script src="js/features/backup.js"></script>
 <script src="js/features/cards.js"></script>
 <script src="js/features/mail.js"></script>
+<script src="js/features/report.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

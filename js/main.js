@@ -1,12 +1,12 @@
 "use strict";
 // ===== 画面（タブ）の切り替え・起動 =====
 // 役割: タブの切り替え、見えている画面だけを描く仕組み、保存したあとの描き直し、日付が変わったときの更新、各画面をつなぐ操作（今日・一覧の行を押す）、起動
-// 依存: util.js, model.js, storage.js, stats.js, dom.js, tab-swipe.js, calendar.js, invest.js, summary.js, settings.js, cards.js, mail.js
+// 依存: util.js, model.js, storage.js, stats.js, dom.js, tab-swipe.js, calendar.js, invest.js, summary.js, settings.js, cards.js, mail.js, report.js
 // 実行時: edit.js, backup.js
 // 公開: RENDER, tab, dirty, showTab, renderAll, lastToday, midnightTimer, refreshIfNewDay, scheduleMidnight
 
 const TITLES = { invest: "投資", summary: "まとめ", settings: "設定" };
-const RENDER = { calendar: renderCalendar, invest: renderInvest, summary: renderSummary, settings: () => { renderSettings(); renderCards(); renderMail(); renderBackup(); } };
+const RENDER = { calendar: renderCalendar, invest: renderInvest, summary: renderSummary, settings: () => { renderSettings(); renderCards(); renderMail(); renderReport(); renderBackup(); } };
 let tab = "calendar";
 const dirty = new Set(Object.keys(RENDER));                         // 描き直しが必要な画面。見えていない画面は、開くまで描かない（電池の節約）
 const renderTab = (t) => { if (dirty.delete(t)) RENDER[t](); };
@@ -71,3 +71,4 @@ state = load(); reindex();
 renderAll();
 showTab("calendar");
 autoMail();                                                       // メール連携の設定があれば、新しい利用明細を調べる
+autoReport();                                                     // 月次の自動送信がオンで、月が替わっていれば、先月分を1回だけ送る

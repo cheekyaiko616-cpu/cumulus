@@ -3,11 +3,12 @@
 // 役割: ブラウザの保存領域への読み書き。保存したあとの画面の更新は、onSaved に入れた処理（main.js が設定）に任せる
 // 依存: model.js, sample.js, stats.js
 // 実行時: なし
-// 公開: KEY, KEY_PREV, KEY_BK, storageOk, onSaved, load, persist, save, tryWrite, readKey, dropKey
+// 公開: KEY, KEY_PREV, KEY_BK, KEY_RP, storageOk, onSaved, load, persist, save, tryWrite, readKey, dropKey
 
 const KEY = "tameru-calendar-v1";   // アプリ名を変えても、この名前は変えない（保存済みの記録を引き続き読むため）
 const KEY_PREV = KEY + "-prev";      // 復元の直前のデータ（1回分。「元に戻す」用）
 const KEY_BK = KEY + "-bk";          // バックアップを最後に保存した日時（ミリ秒）。記録のデータには入れない
+const KEY_RP = KEY + "-rp";          // 月次レポートの設定（自動送信・店名の置き換え・最後に送った月）。記録のデータ（KEY）の形を変えないよう、別のキーにする。バックアップには入れず、「すべての記録を消す」で消す
 let storageOk = true;
 let onSaved = () => {};              // 保存したあとに呼ぶ処理（画面の描き直し）。main.js が入れる
 function load() {
