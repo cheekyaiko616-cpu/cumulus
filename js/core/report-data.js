@@ -1,7 +1,7 @@
 "use strict";
 // ===== 月次レポート用のデータ =====
 // 役割: 指定した月の全件（取引・品目）と集計・投資の記録を、Claudeに渡す・Googleスプレッドシートへ送る形（JSON）にまとめ、貼り付け用の文章（依頼文＋表）と送信の本文を作る。送らないもの（支店名・メモ・番号・写真・URL・合言葉）は、ここで取り除く。集計は rangeStats・payBreakdown を使う。通信と画面は features/report.js
-// 依存: util.js, model.js, billing.js, stats.js
+// 依存: util.js, model.js, billing.js, stats.js, report-profile.js
 // 実行時: receipt-dict.js
 // 公開: REPORT_MAX_TX, REPORT_MAX_ITEMS, normReport, reportPrevMonth, reportMonths, reportMonthSpan, reportClean, reportStore, reportBuild, reportOver, reportText, reportPlan, reportBody, reportDue, reportSamples
 
@@ -96,9 +96,12 @@ function reportBuild(month, anon) {
     const id = new Map([...sum.keys()].sort((a, b) => sum.get(b) - sum.get(a) || (a < b ? -1 : 1)).map((k, i) => [k, "店" + reportLetters(i)]));
     tx.forEach((x) => { if (x.s) x.s = id.get(shopNorm(x.s)); });
   }
+  const prevList = state.entries.filter((e) => e.date >= pf && e.date <= pt), prevDaily = prevList.map((e) => ({ d: e.date, t: e.total, pay: PAY[e.pay], s: nameOf(e.store), k: reportKind(reportClean(e.store, 200)) })).filter((x) => x.k === REPORT_KIND_DAILY);
+  const prevSave = prevList.reduce((a, e) => a + (reportKind(reportClean(e.store, 200)) === REPORT_KIND_SAVE ? e.total : 0), 0);
+  const profile = reportProfile(month, tx.filter((x) => x.k === REPORT_KIND_DAILY), prevDaily, { save: saveTotal, total: st.spent, prevSave, prevTotal: pv.spent });
   const pay = payBreakdown(from, to).rows.map((r) => ({ name: r.pay === "credit" ? reportClean(r.name, 40) || NO_CARD : r.name, sum: r.sum, n: r.n }));
   const invests = state.invests.filter((v) => v.date >= from && v.date <= to).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).map((v) => ({ d: v.date, a: v.amount }));
-  return { v: 1, month, anon: !!anon, summary: { total: st.spent, dailyTotal: st.spent - saveTotal, saveTotal, prevTotal: pv.spent, count: tx.length, itemCount, savedDays: st.savedDays, invest: st.invest, invested: st.invested, uncalc: start > to ? start : "", partial: start > from && start <= to ? start : "" }, pay, tx, invests };
+  return { v: 1, month, anon: !!anon, summary: { total: st.spent, dailyTotal: st.spent - saveTotal, saveTotal, prevTotal: pv.spent, count: tx.length, itemCount, savedDays: st.savedDays, invest: st.invest, invested: st.invested, uncalc: start > to ? start : "", partial: start > from && start <= to ? start : "" }, pay, profile, tx, invests };
 }
 const reportOver = (d) => d.tx.length > REPORT_MAX_TX || d.summary.itemCount > REPORT_MAX_ITEMS;
 // 送り方の計画：取引（と、その品目）を、順番どおり REPORT_PART_TX 件・品目 REPORT_PART_ITEMS 件までずつの分けにする（ふつうの月は1つ）。txAt・itemAt は、その分より前の取引・品目の数（スプレッドシートの書き込み位置）
@@ -113,9 +116,9 @@ function reportPlan(d) {
 }
 // 送信の本文（合言葉は本文に入れる。URLには付けない）。支払い方法別（pay）・店名の置き換えの印は送らない（シート側で使わない）。集計と投資の記録は最後の分だけに入れる。sid は、この送信を見分ける印（保存できたかの確認に使う）
 function reportBody(d, token, sid, plan, i) {
-  if (!sid) return JSON.stringify({ token, v: 1, month: d.month, summary: d.summary, tx: d.tx, invests: d.invests });
+  if (!sid) return JSON.stringify({ token, v: 1, month: d.month, summary: d.summary, profile: d.profile, tx: d.tx, invests: d.invests });
   const p = plan[i], last = i === plan.length - 1, o = { token, v: 1, month: d.month, sid, seq: i, last, txAt: p.txAt, itemAt: p.itemAt, tx: p.tx };
-  if (last) { o.summary = d.summary; o.invests = d.invests; }
+  if (last) { o.summary = d.summary; o.profile = d.profile; o.invests = d.invests; }
   return JSON.stringify(o);
 }
 // 確認用：金額の多い店の例（空の店名は除く）
@@ -131,16 +134,22 @@ const reportRow = (a) => a.map(reportCell).join(",");
 function reportText(d) {
   const y = Number(d.month.slice(0, 4)), m = Number(d.month.slice(5, 7)), s = d.summary, diff = s.total - s.prevTotal;
   const L = [
-    "以下は私の" + y + "年" + m + "月の家計簿データです。月次レポートと、減らせる支出のアドバイスを作ってください。",
-    "・支出の振り返り：合計、前月との比較、支払い方法別、金額や回数の多い支出",
-    "・減らせそうな支出と、その具体的な方法（効果の大きい順）",
-    "・来月の目安",
+    "以下は私の" + y + "年" + m + "月の家計簿データです。支払い行動のプロファイルと、節約に向けた行動目標・指標を詳しく示す月次レポートを作ってください。",
+    "1. 支出の振り返り：合計、前月との比較、支払い方法別、金額や回数の多い支出（日常支出と積立・投資は分けて見る）",
+    "2. 支払い行動のプロファイル：「行動指標」の表を根拠に、この月の支払いの特徴を3〜5個、名前をつけて説明する（例：少額の買い物が多い／土日に偏る／特定の店に集中／クレジットへの偏り）。各特徴に、根拠の数字（今月と前月）を添える",
+    "3. 節約の行動目標：効果の大きい順に3〜5個。各目標を表にする（目標／変える行動を1行／使う指標の項目名／今月の値／来月の目標値／見込める節約額の円と計算式）",
+    "4. 来月に追う指標：毎週見る3〜5個を表にする（指標／今月の値／来月の目標値／見る頻度／見かた）。指標は「行動指標」の項目から選ぶ",
+    "5. 来月の目安：日常支出の上限額と、その根拠。1〜7日・8〜14日・15〜21日・22日〜月末ごとの目安",
+    "6. 良かった点：前月より良くなった指標",
+    "守ること：数字は下の表にあるものだけを使い、計算したものは式を添える。推測は推測と書く。積立・投資は節約の対象にしない。見出し・表・短い文でまとめる。",
     "金額の単位は円。店名は" + (d.anon ? "「店A」などの記号に置き換えてあります（同じ記号は同じ店）。" : "チェーン名に整理し、支店名は除いてあります。") + "品目は品名があるものだけです（品名のない取引は空）。区分は店名のキーワードによる推定で、「積立・投資」は積立・投資の可能性が高い支払い、それ以外は「日常」です。",
     "",
     "# 集計", "項目,値",
     reportRow(["月", d.month]), reportRow(["合計", s.total]), reportRow(["日常支出", s.dailyTotal]), reportRow(["積立・投資額", s.saveTotal]), reportRow(["前月合計", s.prevTotal]), reportRow(["前月との差", (diff > 0 ? "+" : "") + diff]), reportRow(["前月比(%)", reportRatio(s)]),
     reportRow(["取引数", s.count]), reportRow(["品目数", s.itemCount]), reportRow(["使わなかった日数", reportDaysText(s, s.savedDays)]), reportRow(["貯まった投資額", reportDaysText(s, s.invest)]), reportRow(["投資した金額", s.invested]),
     "", "# 支払い方法別", "支払い,金額,件数"].concat(d.pay.map((r) => reportRow([r.name, r.sum, r.n])));
+  L.push("", "# 行動指標（日常支出のみ。積立・投資は除く）", "区分,項目,今月,前月,説明");
+  d.profile.forEach((r) => L.push(reportRow(r)));
   L.push("", "# 取引", "取引ID,日付,曜日,店名,金額,支払い,カード,登録方法,区分");
   d.tx.forEach((x) => L.push(reportRow([x.id, x.d, x.w, x.s, x.t, x.pay, x.card, x.reg, x.k])));
   L.push("", "# 品目", "取引ID,品名,金額");

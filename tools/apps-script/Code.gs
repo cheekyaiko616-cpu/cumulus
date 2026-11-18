@@ -24,10 +24,11 @@ const MAX_BODY = 3000000;            // 受け取る本文の上限（文字数�
 const CUR_PROP = "REPORT_CUR", DONE_PROP = "REPORT_DONE";   // 送信の途中経過（分けて送るとき）・最後に保存できた月（状態の確認用）
 const LOCK_MS = 10000;               // 同時に動いている書き込みを待つ時間。取れなければ busy を返す
 const MAX_PARTS = 40;
-const VERSION = "3";                  // スクリプトの版＝データ版（3＝取引に曜日・区分の列、概要の新しい列。アプリは、3未満だと送らずに貼り替えを案内する）
+const VERSION = "4";                  // スクリプトの版＝データ版（4＝月のシートの行動指標（R〜V列）、3＝取引に曜日・区分の列、概要の新しい列。アプリは、3未満だと送らずに貼り替えを案内する）
 const LINE_PROP = "LINE_TOKEN", LINE_FILE_PROP = "LINE_LAST_FILE", LINE_MISS_PROP = "LINE_MISS_MONTH", RECHECK_PROP = "LINE_RECHECK_MONTH", RECHECK_ID_PROP = "LINE_RECHECK_ID";   // LINEのトークン（スクリプトのプロパティ）・前回通知したファイルID・「見つからない」を送った月
 const LINE_URL = "https://api.line.me/v2/bot/message/broadcast", NOTICE_FN = "sendReportNotice", REPORT_PREFIX = "月次レポート_";
 const MAX_TX = 5000, MAX_ITEMS = 20000, MAX_INVESTS = 500, MAX_ITEMS_PER_TX = 200;
+const MAX_PROFILE = 120;
 const PAY_NAMES = ["現金", "バーコード決済", "クレジット"];
 const REG_NAMES = ["手入力・レシート", "メール", "メール・レシート"];
 const WEEK_NAMES = ["月", "火", "水", "木", "金", "土", "日"], KIND_NAMES = ["積立・投資", "日常"];
@@ -224,6 +225,14 @@ function checkReport(d) {
     }
   }
   if (!last) return "";
+  if (d.profile !== undefined) {                                                          // 行動指標（任意。古いアプリは送らない）：[区分, 項目, 今月, 前月, 説明] の行
+    if (!Array.isArray(d.profile) || d.profile.length > MAX_PROFILE) return "profile";
+    for (let i = 0; i < d.profile.length; i++) {
+      const r = d.profile[i];
+      if (!Array.isArray(r) || r.length !== 5 || !isStr(r[0], 40) || !isStr(r[1], 80) || !isStr(r[4], 200)) return "profile";
+      for (let j = 2; j <= 3; j++) if (!(isStr(r[j], 80) || (typeof r[j] === "number" && isFinite(r[j])))) return "profile";
+    }
+  }
   if (!Array.isArray(d.invests) || d.invests.length > MAX_INVESTS) return "invests";
   for (let i = 0; i < d.invests.length; i++) { const v = d.invests[i]; if (!v || !isDay(v.d) || !isInt(v.a, 0, 1e12)) return "invests"; }
   return "";
@@ -248,6 +257,8 @@ function put(sh, row, col, rows) {
   sh.getRange(row, col, rows.length, w).setValues(rows);
 }
 // 月ごとのシート「YYYY-MM」（列見出しは1行目）：取引（A〜I：取引ID・日付・曜日・店名・金額・支払い・カード・登録方法・区分）・品目（K〜M：取引ID・品名・金額）・投資（O〜P：日付・金額）。J・N は空。同じ月は、最初の分（seq=0）で全部消して書き直す（重複しない）。続きの分は、txAt・itemAt の行へ書く
+const PROFILE_HEAD = ["区分", "項目", "今月", "前月", "説明"];   // 月のシートの R〜V 列：支払い行動の指標（Claudeが月次レポートで読む）
+function safeText(v) { return typeof v === "string" && /^[=+\-@]/.test(v) ? " " + v : v; }   // 数式として読まれないようにする（数はそのまま）
 // 先頭が = + - @ の文字が数式にならないよう、文字の列は「書式なしテキスト」にしてから書く（列ごとに、最初の分で1回の呼び出し）
 function writeMonth(ss, d, seq) {
   let sh = ss.getSheetByName(d.month);
@@ -260,7 +271,7 @@ function writeMonth(ss, d, seq) {
   });
   if (first) {
     sh.clear();
-    sh.getRangeList(["B:D", "F:I", "L:L", "O:O"]).setNumberFormat("@");
+    sh.getRangeList(["B:D", "F:I", "L:L", "O:O", "R:S", "V:V"]).setNumberFormat("@");
     put(sh, 1, 1, [["取引ID", "日付", "曜日", "店名", "金額", "支払い", "カード", "登録方法", "区分"]]);
     put(sh, 1, 11, [["取引ID", "品名", "金額"]]);
     put(sh, 1, 15, [["日付", "金額"]]);
@@ -268,6 +279,8 @@ function writeMonth(ss, d, seq) {
   put(sh, 2 + txAt, 1, tx);
   put(sh, 2 + itemAt, 11, items);
   if (d.last !== false) put(sh, 2, 15, (d.invests || []).map(function (v) { return [v.d, v.a]; }));
+  if (first) put(sh, 1, 18, [PROFILE_HEAD]);
+  if (d.last !== false && d.profile && d.profile.length) put(sh, 2, 18, d.profile.map(function (r) { return [safeText(r[0]), safeText(r[1]), safeText(r[2]), safeText(r[3]), safeText(r[4])]; }));
   return { rows: txAt + tx.length, items: itemAt + items.length };
 }
 // 「概要」シート：月ごとに1行（同じ月は更新）。最初の1回の読み取りで、見出しと月の列を調べ、書き込みは1回。見出しが違う（古い版の概要）ときは、古い方の名前を変えて残し、新しく作る
