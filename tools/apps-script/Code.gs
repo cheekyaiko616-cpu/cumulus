@@ -9,6 +9,9 @@
  * ・書き込みは、件数に関わらず一定回数（範囲ごとに1回の setValues・最後に flush 1回）。数千件を送るときは、アプリが数回に分けて送ります（最初の分で全消去、続きは決まった行へ書く）。実行時間の上限は6分。目安は、通常の月（数百件）で数秒、初回（スプレッドシートの作成を含む）で10秒前後、5,000件で1回の分けあたり数秒
  * ・保存できたかは、doGet の action=status で確かめられます（版・月・件数・時刻だけを返し、記録の中身は返しません）
  * ・貼り替えたあとは、エディタ上部の関数名の欄で authorizeReport を選んで「実行」し、許可を与えてから、新バージョンでデプロイしてください（ウェブアプリは、許可が済むまで止まることがあります）
+ * ・LINE通知（任意）：毎月5日の10時前後（日本時間）に、先月の月次レポートのPDFがドライブにあれば、LINE公式アカウントへ「月次レポートができました。」とファイルのリンクだけを送ります（金額・店名などは送りません）。LINEのチャネルアクセストークンは、コードに書かず、スクリプトのプロパティ LINE_TOKEN に入れます（プロジェクトの設定→スクリプトプロパティ）
+ *   関数：setupMonthlyNotice（毎月のトリガーを1つ作る）／testLineNotice（テスト通知を1通送る）／sendReportNotice（トリガーが呼ぶ）
+ *   増える許可：①外部への通信（script.external_request：LINEへ送る）②トリガーの管理（script.scriptapp：毎月の実行を作る・調べる）。ドライブの許可（既存）で、PDFを探します。貼り替えたあと、もう一度 authorizeReport を実行して許可してください
  */
 const TOKEN = "__TOKEN__";   // アプリが作った合言葉。アプリの「スクリプトをコピー」で自動で入ります
 const DEFAULT_DAYS = 45;     // 何日前までのメールを見るか
@@ -22,6 +25,8 @@ const CUR_PROP = "REPORT_CUR", DONE_PROP = "REPORT_DONE";   // 送信の途中�
 const LOCK_MS = 10000;               // 同時に動いている書き込みを待つ時間。取れなければ busy を返す
 const MAX_PARTS = 40;
 const VERSION = "3";                  // スクリプトの版＝データ版（3＝取引に曜日・区分の列、概要の新しい列。アプリは、3未満だと送らずに貼り替えを案内する）
+const LINE_PROP = "LINE_TOKEN", LINE_FILE_PROP = "LINE_LAST_FILE", LINE_MISS_PROP = "LINE_MISS_MONTH", RECHECK_PROP = "LINE_RECHECK_MONTH", RECHECK_ID_PROP = "LINE_RECHECK_ID";   // LINEのトークン（スクリプトのプロパティ）・前回通知したファイルID・「見つからない」を送った月
+const LINE_URL = "https://api.line.me/v2/bot/message/broadcast", NOTICE_FN = "sendReportNotice", REPORT_PREFIX = "月次レポート_";
 const MAX_TX = 5000, MAX_ITEMS = 20000, MAX_INVESTS = 500, MAX_ITEMS_PER_TX = 200;
 const PAY_NAMES = ["現金", "バーコード決済", "クレジット"];
 const REG_NAMES = ["手入力・レシート", "メール", "メール・レシート"];
@@ -98,6 +103,7 @@ function authorizeReport() {
   SpreadsheetApp.getActiveSpreadsheet();
   DriveApp.getRootFolder().getName();
   PropertiesService.getScriptProperties().getProperty(BOOK_PROP);
+  ScriptApp.getProjectTriggers();   // トリガーの許可（作らない）。外部通信の許可は、sendReportNotice の UrlFetchApp から自動で判定される（ここでは通信しない）
 }
 function readProp(props, k) { try { return JSON.parse(props.getProperty(k) || "null"); } catch (err) { return null; } }
 
@@ -107,7 +113,84 @@ function reportStatus(p) {
   const done = readProp(props, DONE_PROP), cur = readProp(props, CUR_PROP);
   const sid = typeof p.sid === "string" ? p.sid : "";
   const mine = !!done && !!sid && done.sid === sid;
-  return reply({ ok: true, version: VERSION, hasSheet: !!props.getProperty(BOOK_PROP), lastMonth: done ? done.month : "", rows: done ? done.rows : 0, saved: mine, partial: !mine && !!cur && !!sid && cur.sid === sid, at: done ? done.at : "" });
+  return reply({ ok: true, version: VERSION, hasSheet: !!props.getProperty(BOOK_PROP), lastMonth: done ? done.month : "", rows: done ? done.rows : 0, saved: mine, partial: !mine && !!cur && !!sid && cur.sid === sid, at: done ? done.at : "", lineReady: !!props.getProperty(LINE_PROP), hasTrigger: hasNoticeTrigger() });
+}
+
+// ---- LINE通知（毎月5日の10時前後に、先月の月次レポートのPDFのリンクを送る。まだ無ければ10分後に1回だけ再確認する）。トークン・URL・金額はログに出さない（ログはステータスコードだけ） ----
+function jstLastMonth(nowMs) {                       // 日本時間の「先月」（YYYY-MM）
+  const j = new Date(nowMs + 9 * 3600000), y = j.getUTCFullYear(), m = j.getUTCMonth();   // m：今月（0始まり）＝先月の月番号（1始まり）
+  return m === 0 ? (y - 1) + "-12" : y + "-" + ("0" + m).slice(-2);
+}
+function hasNoticeTrigger() {
+  try { return ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === NOTICE_FN; }); } catch (err) { return false; }
+}
+// 1通送る。200以外・例外は1回だけ試し直し、それでも失敗なら false（例外は投げない）
+function lineSend(token, text) {
+  const opt = { method: "post", contentType: "application/json", headers: { Authorization: "Bearer " + token }, payload: JSON.stringify({ messages: [{ type: "text", text: text }] }), muteHttpExceptions: true };
+  for (let i = 0; i < 2; i++) {
+    let code = 0;
+    try { code = UrlFetchApp.fetch(LINE_URL, opt).getResponseCode(); } catch (err) { code = 0; }
+    if (code === 200) return true;
+    Logger.log("LINE HTTP " + code);
+  }
+  return false;
+}
+// 先月のPDF（名前が「月次レポート_YYYY-MM」で始まり .pdf で終わる。ゴミ箱は除く）のうち、作成日時が最新の1つ。なければ null
+function findReportPdf(month) {
+  const prefix = REPORT_PREFIX + month;
+  const it = DriveApp.searchFiles('title contains "' + prefix + '" and trashed = false');
+  let best = null;
+  while (it.hasNext()) {
+    const f = it.next(), n = String(f.getName());
+    if (n.indexOf(prefix) !== 0 || !/\.pdf$/i.test(n)) continue;
+    if (!best || f.getDateCreated().getTime() > best.getDateCreated().getTime()) best = f;
+  }
+  return best;
+}
+// トリガーが呼ぶ。戻り値は状態の文字（no-token／sent／already／recheck-scheduled／missing-sent／missing-skip／failed）
+function sendReportNotice() {
+  const props = PropertiesService.getScriptProperties(), token = props.getProperty(LINE_PROP);
+  if (!token) return "no-token";
+  const month = jstLastMonth(Date.now()), f = findReportPdf(month);
+  const again = props.getProperty(RECHECK_PROP) === month;   // この月の再確認トリガーを、すでに作った（＝今回は再確認）
+  if (again) dropRecheck(props);                              // 使い捨て：動いたら自分で削除
+  if (f) {
+    const id = f.getId();
+    if (props.getProperty(LINE_FILE_PROP) === id) return "already";
+    if (!lineSend(token, "月次レポートができました。\n" + f.getUrl())) return "failed";
+    props.setProperty(LINE_FILE_PROP, id);
+    return "sent";
+  }
+  if (!again) {   // 1回目：警告は送らず、10分後に1回だけ再確認する（同じ月に作るのは1回だけ）
+    try {
+      const t = ScriptApp.newTrigger(NOTICE_FN).timeBased().after(10 * 60 * 1000).create();
+      props.setProperty(RECHECK_PROP, month);
+      props.setProperty(RECHECK_ID_PROP, String(t.getUniqueId()));
+      return "recheck-scheduled";
+    } catch (err) { /* 作れないときは、下で警告を送る */ }
+  }
+  if (props.getProperty(LINE_MISS_PROP) === month) return "missing-skip";
+  if (!lineSend(token, "月次レポートがまだ見つかりません。月次レポートの実行結果を確認してください。")) return "failed";
+  props.setProperty(LINE_MISS_PROP, month);
+  return "missing-sent";
+}
+// 使い捨ての再確認トリガーを削除する（記録したIDのものだけ）
+function dropRecheck(props) {
+  const id = props.getProperty(RECHECK_ID_PROP);
+  if (!id) return;
+  try { ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getUniqueId() === id) ScriptApp.deleteTrigger(t); }); } catch (err) { /* 削除できなくても通知は続ける */ }
+  props.deleteProperty(RECHECK_ID_PROP);
+}
+// 毎月5日の10時前後（日本時間。nearMinute(0)で9:45〜10:15の間）の実行を1つだけ作る（同じ関数の既存のトリガーは全部消す）
+function setupMonthlyNotice() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === NOTICE_FN) ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger(NOTICE_FN).timeBased().onMonthDay(5).atHour(10).nearMinute(0).inTimezone("Asia/Tokyo").create();
+}
+// テスト通知を1通だけ送る（リンクなし）
+function testLineNotice() {
+  const token = PropertiesService.getScriptProperties().getProperty(LINE_PROP);
+  if (!token) return "no-token";
+  return lineSend(token, "テスト通知です。月次レポートの通知が使えます。") ? "sent" : "failed";
 }
 
 const isInt = function (v, lo, hi) { return typeof v === "number" && isFinite(v) && Math.floor(v) === v && v >= lo && v <= hi; };

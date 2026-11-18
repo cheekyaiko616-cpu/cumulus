@@ -78,6 +78,7 @@ const RP_DIAG = {
   http: "つながりましたが、受け付けられません。URLと、デプロイの「アクセスできるユーザー」を確認してください。",
   none: "応答がありません。通信状況とURLを確認してください。",
 };
+const rpLineText = (j) => typeof j.lineReady !== "boolean" || typeof j.hasTrigger !== "boolean" ? "" : "\nLINE通知：" + (!j.lineReady ? "トークン未設定" : !j.hasTrigger ? "トリガー未設定" : "設定済み");   // 古い版（項目なし）では出さない
 async function rpCheck() {
   if (rpBusy) return;
   if (!mailReady()) { rpMsg(rpErrText(new Error("setup"))); return; }
@@ -85,7 +86,7 @@ async function rpCheck() {
   try {
     const r = await rpProbe("", "", 20000);
     if (r.kind !== "ok") rpMsg(RP_DIAG[r.kind]);
-    else rpMsg("新しいスクリプトです（版 " + r.j.version + "）。" + (r.j.lastMonth ? "保存済み：" + r.j.lastMonth + "・" + r.j.rows + "件" : "まだ保存はありません。"));
+    else rpMsg("新しいスクリプトです（版 " + r.j.version + "）。" + (r.j.lastMonth ? "保存済み：" + r.j.lastMonth + "・" + r.j.rows + "件" : "まだ保存はありません。") + rpLineText(r.j));
   } finally { rpBusy = rpChecking = false; rpCtl = null; $("rpCheck").disabled = false; renderReport(); }
 }
 const rpErrText = (e) => ({
